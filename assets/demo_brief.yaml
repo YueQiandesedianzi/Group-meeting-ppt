@@ -1,0 +1,68 @@
+meta:
+  title: 面向 X 的机器学习建模进展
+  subtitle: 组会汇报
+  presenter: 张三
+  date: 2026-11-09
+
+sections:
+  - type: cover
+    title: 面向 X 的机器学习建模进展
+    presenter: 张三
+    date: 2026-11-09
+
+  - type: agenda
+    heading: 汇报提纲
+    items: [研究背景, 方法与数据, 关键结果, 讨论, 下一步计划]
+
+  - type: section_header
+    heading: 研究背景与问题
+
+  - type: points
+    heading: 研究动机
+    points:
+      - 现有方法在 Y 场景下精度不足
+      - 本文拟引入 Z 结构提升泛化
+    emphasis: 核心问题：如何在数据受限下提升泛化能力
+
+  - type: section_header
+    heading: 方法与数据
+
+  - type: points
+    heading: 建模流程
+    points:
+      - 数据预处理与特征工程
+      - 模型结构 Z 的设计
+      - 训练与评估协议
+
+  - type: section_header
+    heading: 关键结果
+
+  - type: figure
+    heading: 精度对比
+    image: demo_figure.png
+    caption: 不同方法在测试集上的精度对比
+    takeaways:
+      - 方法 A 较基线提升 3.2 个百分点
+    metrics:
+      - { label: 测试精度, value: 91.4% }
+
+  - type: metrics
+    heading: 主要指标
+    metrics:
+      - { label: 测试精度, value: 91.4%, note: 基线 88.2% }
+      - { label: 参数量, value: 12M, note: 更小更快 }
+
+  - type: section_header
+    heading: 讨论与下一步
+
+  - type: conclusion
+    heading: 小结
+    points:
+      - Z 结构有效提升泛化
+      - 主要指标优于基线
+
+  - type: next_steps
+    heading: 下一步计划
+    items:
+      - { task: 补做消融实验, deadline: 11 月底 }
+      - { task: 完成综述初稿, deadline: 12 月中 }

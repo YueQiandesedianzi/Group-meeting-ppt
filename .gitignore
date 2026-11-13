@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# 本地配置、凭据与编辑器
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+
+# 生成的 Office 文档和历史；assets/ 中的示例图不受影响
+out/
+output/
+history/
+*.pptx
+*.ppt
+*.pdf
+~$*
+
+# 可能包含真实研究内容的本地 brief；保留 assets/demo_brief.yaml
+brief.yaml
+brief.yml
+brief_filled.yaml
+
+# 系统垃圾文件
+Thumbs.db
+Desktop.ini
+.DS_Store

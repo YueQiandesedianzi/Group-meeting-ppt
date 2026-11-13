@@ -1,0 +1,18 @@
+name: default
+description: 内置默认主题（学术藏青蓝）
+slide:
+  aspect: "16:9"
+  width_in: 13.333
+  height_in: 7.5
+colors:
+  primary: "#1F3864"
+  accent: "#2E74B5"
+  light: "#D6E4F0"
+  text: "#333333"
+  muted: "#808080"
+  line: "#C9C9C9"
+  background: "#FFFFFF"
+fonts:
+  cjk: "微软雅黑"
+  latin: "Calibri"
+default: true

@@ -1,0 +1,9 @@
+# CLI 与模板导入
+PyYAML
+Pillow
+python-pptx
+lxml
+
+# --history-dir 的轻量预览
+numpy
+matplotlib

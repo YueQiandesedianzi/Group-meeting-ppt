@@ -1,0 +1,17 @@
+name: lab
+description: 课题组配色示例（仅主题级配色与字体，不含原 PPT 母版或版式）
+slide:
+  aspect: "16:9"
+  width_in: 13.333
+  height_in: 7.5
+colors:
+  primary: "#17406D"
+  accent: "#0F6FC6"
+  light: "#DBEFF9"
+  text: "#333333"
+  muted: "#808080"
+  line: "#C9C9C9"
+  background: "#FFFFFF"
+fonts:
+  cjk: "微软雅黑"
+  latin: "Calibri"
