@@ -12,6 +12,27 @@
 
 **能力边界：** 本项目使用主题级模板和内置版式，不保留外部参考 PPT 的母版，也不逐像素复刻其版式。`lab` 模板仅包含匿名化的配色、字体和页面尺寸，不包含原 PPT 文件、Logo 或真实汇报内容。
 
+## 效果预览
+
+下图由 `assets/demo_brief.yaml` 经 `lab` 模板实际生成后渲染（12 页 16:9），内容为演示占位数据。
+
+![12 页示例 deck 的效果总览](docs/assets/slides-overview.png)
+
+工作台支持 brief 编辑、模板管理、生成与历史版本预览：
+
+![组会 PPT 工作台](docs/assets/workbench.png)
+
+<details>
+<summary>更多示例页（封面 / 结果图 / 指标）</summary>
+
+![封面页](docs/assets/slide-01-cover.png)
+
+![结果图页](docs/assets/slide-08-figure.png)
+
+![指标页](docs/assets/slide-09-metrics.png)
+
+</details>
+
 ## 环境与安装
 
 已在 **Windows + Python 3.13.9** 环境验证。其他 Python 版本和操作系统尚未全面测试。
@@ -104,6 +125,12 @@ python -m unittest discover -s tests -p test_history.py -v
 - **本地隐私：** 生成过程在本机进行；工作台会将最近文件、输出和历史目录的绝对路径保存到用户目录下的 `.bohrium/ppt-workbench.json`，历史目录还会保存 brief 副本。清理本地文件或分享目录前请检查科研内容。
 - 同一输出文件和历史目录应串行生成，不支持多进程同时写入。
 - 参考 PPT 主题提取是基础能力，复杂 Office 主题可能需要手动校正颜色与字体。
+
+## 致谢
+
+- 感谢**玻尔（Bohrium）**提供模型 API Token 与网关支持，本项目的脚本调试、文档撰写与测试验证借助其模型服务完成。
+- 感谢 [python-pptx](https://python-pptx.readthedocs.io/)、[PyYAML](https://pyyaml.org/)、[Pillow](https://python-pillow.org/)、[lxml](https://lxml.de/)、[NumPy](https://numpy.org/)、[Matplotlib](https://matplotlib.org/) 等开源项目。
+- 仓库不包含任何 Token 或凭据，请在本机自行配置密钥；请勿把密钥写入 `brief.yaml` 或提交到历史目录。
 
 ## 许可证
 
