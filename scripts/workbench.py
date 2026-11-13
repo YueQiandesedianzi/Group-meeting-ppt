@@ -51,6 +51,7 @@ def run_generate(brief_path, output, template_name=None, slide=None, history_dir
     template_data, loaded_template_hash = g.load_yaml_with_hash(tpl_path)
     th = g.Theme(template_data)
     g.validate_snapshot_inputs(brief_path, brief, tpl_path)
+    g.validate_output_path(output, brief_path, tpl_path, brief, base_dir)
     image_dependencies = g.collect_image_dependencies(brief, base_dir) if history_dir else []
     source_info = (
         g.describe_inputs(
@@ -410,23 +411,27 @@ class Workbench(tk.Tk):
 
     def save_brief(self):
         if not self.brief_path:
-            self.save_brief_as()
-            return
+            return self.save_brief_as()
         try:
             with open(self.brief_path, "w", encoding="utf-8") as fh:
                 fh.write(self.brief_text.get("1.0", "end"))
         except Exception as e:
             messagebox.showerror("错误", f"保存失败：{e}")
-            return
+            return False
         self.update_status()
+        return True
 
     def save_brief_as(self):
         path = filedialog.asksaveasfilename(defaultextension=".yaml", filetypes=[("YAML", "*.yaml")], title="另存 brief")
         if not path:
-            return
+            return False
+        previous_path = self.brief_path
         self.brief_path = path
-        self.save_brief()
+        if not self.save_brief():
+            self.brief_path = previous_path
+            return False
         self.brief_path_var.set(path)
+        return True
 
     def validate_brief(self):
         import yaml
@@ -459,8 +464,7 @@ class Workbench(tk.Tk):
         if not self.brief_path:
             messagebox.showwarning("提示", "请先保存 brief")
             return False
-        self.save_brief()
-        return True
+        return self.save_brief()
 
     def do_generate(self, slide):
         if not self._ensure_brief_saved():
@@ -609,8 +613,10 @@ class Workbench(tk.Tk):
     def save_template(self):
         import yaml
         name = self.tpl_name.get().strip()
-        if not name or name.lower() == "default":
-            messagebox.showwarning("提示", "请填写模板名（不能与内置 default 重名）")
+        try:
+            out = tw.template_output_path(TDIR, name)
+        except ValueError as e:
+            messagebox.showwarning("提示", str(e))
             return
         data = {
             "name": name,
@@ -621,7 +627,6 @@ class Workbench(tk.Tk):
                       "latin": self.tpl_latin.get().strip() or tw.DEFAULT_FONTS["latin"]},
             "default": bool(self.tpl_default.get()),
         }
-        out = os.path.join(TDIR, name + ".yaml")
         if os.path.exists(out) and not messagebox.askyesno("覆盖", f"{out} 已存在，是否覆盖？"):
             return
         try:
@@ -672,3 +677,4 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+

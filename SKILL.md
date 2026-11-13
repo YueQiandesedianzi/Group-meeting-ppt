@@ -40,6 +40,7 @@ description: 生成可编辑的科研组会汇报 PPT（.pptx）。按 brief.yam
 - `brief.yaml` 是内容/结构的**唯一事实源**，`.pptx` 是派生产物；改动内容一律改 brief，不从 pptx 反向解析。
 - **默认同名覆盖**：重跑固定写 `-o` 路径，不自动生成 `_v2/_v3`。
 - **单页重建**：只改某一节时用 `--slide N`（N 即 brief 第 N 个 section），原地重绘该页、保留其余页（含 PPT 里的视觉微调）。
+- **输入保护**：输出不能覆盖 brief、所选模板或引用图片；单页重建时现有 PPT 页数必须与 brief 一致，页序仍需自行核对。
 - **变更检测**：开启 `--history-dir` 时，brief、模板、图片、生成器、输出身份及实际输出文件哈希都匹配才跳过全量重建。单页重建后标记为需要全量重建，即使 brief 随后恢复原内容也不会误跳过。
 - **收敛**：生成→检查→改 brief 的循环最多 2–3 轮，修改建议一次列全。
 
@@ -75,6 +76,7 @@ history/
 - 默认章节骨架：封面 → 目录 → 背景 → 方法 → 结果 → 讨论 → 结论 → 下一步。
 - 逐块分类：有图 → `figure`；成组数字 → `metrics`（多行对照 → `table`）；带时间 → `timeline`；纯文字 → `points`。
 - 校验失败会非零退出并给出具体错误；`figure.image` 必须存在，`table` 每行长度与列数一致。
+- 目录、时间线、下一步计划每页最多 12 项，超出时拆页。长文字仍需在生成的 PPT 中检查是否溢出。
 
 ## 模板（主题级）
 
@@ -103,5 +105,6 @@ default: true
 历史功能与基本版式回归测试（不读取或改写真实历史）：
 
 ```bash
-python -m unittest discover -s tests -p test_history.py -v
+python -m unittest discover -s tests -v
 ```
+

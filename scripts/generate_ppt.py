@@ -134,6 +134,19 @@ def normalized_output_path(output):
     return os.path.normcase(os.path.realpath(os.path.abspath(output)))
 
 
+def validate_output_path(output, brief_path, template_path, brief, base_dir):
+    """拒绝输出覆盖原始输入，也检查已有硬链接。"""
+    sources = [brief_path, template_path] + [
+        image_path(s["image"], base_dir) for s in brief["sections"] if s["type"] == "figure"
+    ]
+    for source in sources:
+        same = normalized_output_path(output) == normalized_output_path(source)
+        if not same and os.path.exists(output):
+            same = os.path.samefile(output, source)
+        if same:
+            raise ValueError(f"输出路径不能覆盖输入文件：{source}")
+
+
 def generation_fingerprint(source_info, output):
     payload = {
         "format_version": SNAPSHOT_FORMAT_VERSION,
@@ -378,9 +391,14 @@ def draw_cover(slide, sec, th):
 def draw_agenda(slide, sec, th):
     CW = th.W - 2 * MX
     draw_heading(slide, th, sec.get("heading", "汇报提纲"))
-    y = 1.5
-    for i, it in enumerate(sec.get("items", []), 1):
-        chip = add_box(slide, MX, y + 0.02, 0.42, 0.42, fill=th.c("accent"))
+    items = sec.get("items", [])
+    cols = 2 if len(items) > 6 else 1
+    rows = math.ceil(len(items) / cols) if items else 0
+    col_width = (CW - (0.4 if cols == 2 else 0)) / cols
+    for index, it in enumerate(items):
+        col, row = divmod(index, rows)
+        x, y = MX + col * (col_width + 0.4), 1.5 + row * 0.82
+        chip = add_box(slide, x, y + 0.02, 0.42, 0.42, fill=th.c("accent"))
         ctf = chip.text_frame
         ctf.word_wrap = False
         ctf.margin_left = 0
@@ -390,11 +408,10 @@ def draw_agenda(slide, sec, th):
         ctf.vertical_anchor = MSO_ANCHOR.MIDDLE
         cp = ctf.paragraphs[0]
         cp.alignment = PP_ALIGN.CENTER
-        set_run(cp.add_run(), str(i), th, size=13, bold=True, color=RGBColor(0xFF, 0xFF, 0xFF))
-        tf = add_text(slide, MX + 0.65, y, CW - 0.65, 0.5, anchor=MSO_ANCHOR.MIDDLE)
+        set_run(cp.add_run(), str(index + 1), th, size=13, bold=True, color=RGBColor(0xFF, 0xFF, 0xFF))
+        tf = add_text(slide, x + 0.65, y, col_width - 0.65, 0.6, anchor=MSO_ANCHOR.MIDDLE)
         p = tf.paragraphs[0]
         set_run(p.add_run(), str(it), th, size=16)
-        y += 0.72
 
 
 def draw_section_header(slide, sec, th):
@@ -535,23 +552,29 @@ def draw_timeline(slide, sec, th):
     steps = sec.get("steps", [])
     if not steps:
         return
-    line_y = 3.4
-    add_box(slide, MX + 0.6, line_y, CW - 1.2, 0.02, fill=th.c("line"), shape=MSO_SHAPE.RECTANGLE)
-    span = CW - 1.2
-    n = len(steps)
+    per_row = math.ceil(len(steps) / 2) if len(steps) > 5 else len(steps)
+    nrows = math.ceil(len(steps) / per_row)
     for i, st in enumerate(steps):
-        cx = MX + 0.6 + span * (i / (n - 1) if n > 1 else 0.5)
+        row, col = divmod(i, per_row)
+        count = min(per_row, len(steps) - row * per_row)
+        cell_w = CW / count
+        cx = MX + (col + 0.5) * cell_w
+        line_y = 3.4 if nrows == 1 else 2.25 + row * 2.7
+        if col == 0 and count > 1:
+            add_box(slide, MX + cell_w / 2, line_y, CW - cell_w, 0.02,
+                    fill=th.c("line"), shape=MSO_SHAPE.RECTANGLE)
+        label_w = min(2.4, cell_w - 0.1)
         add_box(slide, cx - 0.09, line_y - 0.09, 0.18, 0.18, fill=th.c("accent"), shape=MSO_SHAPE.OVAL)
-        tf = add_text(slide, cx - 1.2, line_y - 0.75, 2.4, 0.4, anchor=MSO_ANCHOR.MIDDLE)
+        tf = add_text(slide, cx - label_w / 2, line_y - 0.75, label_w, 0.4, anchor=MSO_ANCHOR.MIDDLE)
         p = tf.paragraphs[0]
         p.alignment = PP_ALIGN.CENTER
         set_run(p.add_run(), str(st.get("time", "")), th, size=14, bold=True, color=th.c("primary"))
-        tf = add_text(slide, cx - 1.2, line_y + 0.28, 2.4, 0.5, anchor=MSO_ANCHOR.TOP)
+        tf = add_text(slide, cx - label_w / 2, line_y + 0.28, label_w, 0.5, anchor=MSO_ANCHOR.TOP)
         p = tf.paragraphs[0]
         p.alignment = PP_ALIGN.CENTER
         set_run(p.add_run(), str(st.get("title", "")), th, size=14, bold=True, color=th.c("text"))
         if st.get("detail"):
-            tf = add_text(slide, cx - 1.2, line_y + 0.78, 2.4, 0.9, anchor=MSO_ANCHOR.TOP)
+            tf = add_text(slide, cx - label_w / 2, line_y + 0.78, label_w, 0.9, anchor=MSO_ANCHOR.TOP)
             p = tf.paragraphs[0]
             p.alignment = PP_ALIGN.CENTER
             set_run(p.add_run(), str(st["detail"]), th, size=11, color=th.c("muted"))
@@ -573,11 +596,16 @@ def draw_conclusion(slide, sec, th):
 def draw_next_steps(slide, sec, th):
     CW = th.W - 2 * MX
     draw_heading(slide, th, sec.get("heading", "下一步计划"))
-    y = 1.5
+    items = sec.get("items", [])
+    cols = 2 if len(items) > 5 else 1
+    rows = math.ceil(len(items) / cols) if items else 0
+    col_width = (CW - (0.4 if cols == 2 else 0)) / cols
     ch, gap = 0.85, 0.18
-    for it in sec.get("items", []):
-        add_box(slide, MX, y, CW, ch, fill=th.c("light"), line=None)
-        tf = add_text(slide, MX + 0.3, y, CW - 0.6, ch, anchor=MSO_ANCHOR.MIDDLE)
+    for index, it in enumerate(items):
+        col, row = divmod(index, rows)
+        x, y = MX + col * (col_width + 0.4), 1.5 + row * (ch + gap)
+        add_box(slide, x, y, col_width, ch, fill=th.c("light"), line=None)
+        tf = add_text(slide, x + 0.3, y, col_width - 0.6, ch, anchor=MSO_ANCHOR.MIDDLE)
         p = tf.paragraphs[0]
         set_run(p.add_run(), str(it.get("task", "")), th, size=15, bold=True, color=th.c("text"))
         meta = " · ".join(
@@ -588,7 +616,6 @@ def draw_next_steps(slide, sec, th):
         )
         if meta:
             set_run(p.add_run(), "    " + meta, th, size=11, color=th.c("muted"))
-        y += ch + gap
 
 
 DISPATCH = {
@@ -619,20 +646,47 @@ def draw(slide, sec, th, base_dir):
 # ---------------- 校验 ----------------
 
 def validate(brief, base_dir):
-    meta = brief.get("meta") or {}
-    if not (meta.get("title") or "").strip():
+    if not isinstance(brief, dict):
+        raise ValueError("brief 顶层必须是包含 meta 和 sections 的映射")
+    meta = brief.get("meta")
+    if not isinstance(meta, dict) or not isinstance(meta.get("title"), str) or not meta["title"].strip():
         raise ValueError("meta.title 必填且非空")
     secs = brief.get("sections")
     if not isinstance(secs, list) or not secs:
         raise ValueError("sections 必填且非空列表")
     for i, sec in enumerate(secs, 1):
+        if not isinstance(sec, dict):
+            raise ValueError(f"第 {i} 段必须是映射")
         t = sec.get("type")
-        if t not in ALLOWED_TYPES:
+        if not isinstance(t, str) or t not in ALLOWED_TYPES:
             raise ValueError(f"第 {i} 段：未知类型 {t!r}")
         for k in REQUIRED.get(t, []):
             v = sec.get(k)
             if v is None or (isinstance(v, (str, list)) and len(v) == 0):
                 raise ValueError(f"第 {i} 段（{t}）：缺少字段 {k}")
+        for key in ("title", "heading", "subtitle", "emphasis", "caption"):
+            if key in sec and sec[key] is not None and not isinstance(sec[key], str):
+                raise ValueError(f"第 {i} 段：{key} 必须是文本")
+        for key in REQUIRED[t]:
+            if key in ("title", "heading", "image") and (not isinstance(sec[key], str) or not sec[key].strip()):
+                raise ValueError(f"第 {i} 段：{key} 必须是非空文本")
+        for key in ("items", "points", "takeaways", "metrics", "columns", "rows", "steps"):
+            if key in sec and not isinstance(sec[key], list):
+                raise ValueError(f"第 {i} 段：{key} 必须是列表")
+        for key in ("points", "takeaways"):
+            if any(v is None or isinstance(v, (dict, list)) or (isinstance(v, str) and not v.strip()) for v in sec.get(key, [])):
+                raise ValueError(f"第 {i} 段：{key} 不能包含空项或嵌套内容")
+        if t == "agenda" and any(v is None or isinstance(v, (dict, list)) or (isinstance(v, str) and not v.strip()) for v in sec["items"]):
+            raise ValueError(f"第 {i} 段：items 不能包含空项或嵌套内容")
+        for key in ("metrics", "steps"):
+            if any(not isinstance(v, dict) for v in sec.get(key, [])):
+                raise ValueError(f"第 {i} 段：{key} 的每项必须是映射")
+        if t == "next_steps" and any(not isinstance(v, dict) for v in sec["items"]):
+            raise ValueError(f"第 {i} 段：items 的每项必须是映射")
+        if t in ("agenda", "timeline", "next_steps"):
+            key = "steps" if t == "timeline" else "items"
+            if len(sec[key]) > 12:
+                raise ValueError(f"第 {i} 段：{key} 最多 12 项，请拆分为多页")
         if t == "figure":
             p = image_path(sec["image"], base_dir)
             if not os.path.isfile(p):
@@ -640,6 +694,8 @@ def validate(brief, base_dir):
         if t == "table":
             ncols = len(sec["columns"])
             for r_i, row in enumerate(sec["rows"], 1):
+                if not isinstance(row, list):
+                    raise ValueError(f"第 {i} 段（table）：第 {r_i} 行必须是列表")
                 if len(row) != ncols:
                     raise ValueError(
                         f"第 {i} 段（table）：第 {r_i} 行长度 {len(row)} 与列数 {ncols} 不一致"
@@ -856,9 +912,13 @@ def write_snapshot(brief_path, brief, th, history_dir, template_path,
 
 def build(brief, th, args, base_dir):
     sections = brief["sections"]
+    if args.slide is not None and not (1 <= args.slide <= len(sections)):
+        raise ValueError(f"--slide {args.slide} 超出范围（1–{len(sections)}）")
 
     if args.slide is not None and os.path.isfile(args.output):
         prs = Presentation(args.output)
+        if len(prs.slides) != len(sections):
+            raise ValueError("现有 PPT 页数与 brief 段数不一致，请先全量生成")
         layout = prs.slide_layouts[6]
         idx = args.slide - 1
         if not (0 <= idx < len(sections)):
@@ -924,6 +984,12 @@ def main(argv):
         return 2
     out_abs = os.path.abspath(args.output)
 
+    try:
+        validate_output_path(out_abs, brief_path, tpl_path, brief, base_dir)
+    except (OSError, ValueError) as e:
+        print(f"错误：{e}", file=sys.stderr)
+        return 2
+
     source_info = None
     image_dependencies = []
     try:
@@ -942,8 +1008,12 @@ def main(argv):
         return 2
 
     out_dir = os.path.dirname(out_abs) or "."
-    os.makedirs(out_dir, exist_ok=True)
-    prs.save(out_abs)
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+        prs.save(out_abs)
+    except OSError as e:
+        print(f"错误：无法保存 PPT：{e}", file=sys.stderr)
+        return 2
     print(f"共 {len(prs.slides)} 页 · 模板 {th.name} → {out_abs}")
 
     if args.history_dir:
@@ -968,3 +1038,4 @@ def main(argv):
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
+

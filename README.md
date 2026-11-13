@@ -107,19 +107,20 @@ python scripts/generate_ppt.py out/history/versions/<id>/brief.yaml -o out/resto
 python scripts/generate_ppt.py brief.yaml -o out/demo.pptx --slide 2
 ```
 
-单页操作会保留其他页面，但会把历史状态标为需要后续全量重建。它仅适用于由同一 brief 生成、页数和页序未发生外部调整的 PPT。
+单页操作会保留其他页面，但会把历史状态标为需要后续全量重建。它仅适用于由同一 brief 生成、页数和页序未发生外部调整的 PPT；页数不一致时拒绝操作，页序仍需自行核对。
 
 ## 测试
 
 ```bash
-python -m unittest discover -s tests -p test_history.py -v
+python -m unittest discover -s tests -v
 ```
 
 测试覆盖完整历史重建、图片去重、模板与图片变化、失败回滚、输出哈希校验、单页后全量、归档损坏、旧格式兼容以及 10 类版式。测试输入和输出均位于临时目录，不读取真实组会历史。
 
 ## 使用注意
 
-- **输出覆盖：** `-o` 指向的已有文件会被覆盖。务必使用独立的 `.pptx` 输出路径，不要将输出指向 brief、模板或源图片。
+- **输出覆盖：** `-o` 指向的已有输出文件会被覆盖；程序拒绝覆盖当前 brief、所选模板或引用图片。
+- **版式容量：** 目录、时间线和下一步计划每页最多 12 项，更多内容请拆页；长文字仍可能超出文本框，请打开 PPT 检查。
 - **单页旧图：** 当前实现尚未完整清理被替换图片的 PPTX 内部 relationship。需要彻底删除敏感旧图时，请全量生成到一个新的输出文件。
 - **编辑保存：** 工作台尚未实现未保存内容提醒。打开其他 brief 或关闭窗口前，请先手动保存。
 - **本地隐私：** 生成过程在本机进行；工作台会将最近文件、输出和历史目录的绝对路径保存到用户目录下的 `.bohrium/ppt-workbench.json`，历史目录还会保存 brief 副本。清理本地文件或分享目录前请检查科研内容。
@@ -135,3 +136,4 @@ python -m unittest discover -s tests -p test_history.py -v
 ## 许可证
 
 采用仓库创建时选择的 [MIT License](LICENSE)。字体等第三方资源不随仓库分发，不在该许可证的授权范围内。
+

@@ -29,6 +29,24 @@ COLOR_LABELS = {
 }
 
 
+def template_output_path(tdir, name):
+    """Return a safe template filename confined to the template directory."""
+    if (not name or name.lower() == "default" or name in {".", ".."}
+            or name != name.strip() or name.endswith(".")
+            or any(c in name for c in '/\\:*?"<>|')
+            or any(ord(c) < 32 for c in name)):
+        raise ValueError("模板名无效：请使用普通文件名，不能使用 default 或路径字符")
+    stem = name.split(".", 1)[0].upper()
+    if stem in {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)),
+                *(f"LPT{i}" for i in range(1, 10))}:
+        raise ValueError("模板名不能使用系统保留名称")
+    directory = os.path.realpath(tdir)
+    path = os.path.join(directory, name + ".yaml")
+    if os.path.commonpath([directory, os.path.realpath(path)]) != directory:
+        raise ValueError("模板文件必须位于模板目录内")
+    return path
+
+
 def extract_theme(path):
     """主题级提取：页面尺寸 + 配色 + 字体。失败时保留默认值。"""
     from pptx import Presentation
@@ -244,8 +262,10 @@ class Wizard(tk.Tk):
 
     def save(self):
         name = self.name_var.get().strip()
-        if not name or name.lower() == "default":
-            messagebox.showwarning("提示", "请填写模板名（不能与内置 default 重名）")
+        try:
+            out = template_output_path(self.tdir, name)
+        except ValueError as e:
+            messagebox.showwarning("提示", str(e))
             return
         self.data["name"] = name
         self.data["description"] = self.desc_var.get().strip()
@@ -254,7 +274,6 @@ class Wizard(tk.Tk):
             "latin": self.latin_var.get().strip() or DEFAULT_FONTS["latin"],
         }
         self.data["default"] = bool(self.default_var.get())
-        out = os.path.join(self.tdir, name + ".yaml")
         if os.path.exists(out):
             if not messagebox.askyesno("覆盖", f"{out} 已存在，是否覆盖？"):
                 return
@@ -278,3 +297,4 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
