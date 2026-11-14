@@ -16,6 +16,7 @@ v2/
 │  └─ object_ops_demo.py  对象级修改原型验证（未指向对象保留 + 部件保留）
 ├─ engine/
 │  └─ object_ops.py       对象级修改适配层：文本 / 图片 / 几何 / 页序 + 身份冲突保护
+├─ tests/test_m0.py       M0 回归测试（快速 11 项 + 慢速客户端往返 2 项）
 ├─ samples/               生成的样例（PPTX、映射 JSON 与配图）
 └─ reports/               机器可读的验证报告
 ```
@@ -29,6 +30,9 @@ python v2\tools\roundtrip_check.py --input v2\samples\reference-template.pptx --
 python v2\tools\retention_check.py v2\samples\reference-template.pptx v2\samples\reference-template.roundtrip.pptx
 python v2\tools\tags_probe.py
 python v2\tools\object_ops_demo.py
+
+python -m unittest discover -s v2/tests -v                          # 快速回归
+$env:GM_PPT_SLOW='1'; python -m unittest discover -s v2/tests -v    # 含客户端往返
 ```
 
 `roundtrip_check.py` 默认用 DSH 自带的 LibreOffice Kit 作为客户端代理；可用 `--node` /
