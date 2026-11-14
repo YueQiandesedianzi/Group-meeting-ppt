@@ -1,16 +1,16 @@
 # Group-meeting-ppt
 
-将科研组会素材整理为**可编辑的 16:9 PowerPoint**。内容与结构由 `brief.yaml` 管理，模板决定配色、字体和页面尺寸，脚本负责校验与渲染。既可作为支持 `SKILL.md` 的本地 Agent Skill，也可直接用 Python 运行。
+![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
+![版式](https://img.shields.io/badge/版式-10类-2E74B5)
 
-## 功能
+**把一次组会汇报的素材，确定性转成可编辑的 16:9 PowerPoint。**
+内容与结构写在 `brief.yaml`，模板决定配色、字体与页面尺寸，脚本负责校验与渲染——内容只写一次，排版交给脚本，生成的页面全是可以继续手改的文本框与形状。
 
-- 内置封面、目录、章节页、要点、图片、指标、表格、时间线、结论、下一步计划等 [10 类版式](references/layout-library.md)。
-- 通过 YAML 自定义主题；可用 Tkinter 向导从 PPTX 提取基础主题。
-- 图形工作台支持 brief 编辑、模板管理、生成和历史预览。
-- 支持单页重建，以及保存 brief、模板、图片和轻量预览的历史版本。
-- 历史图片按 SHA-256 去重，可在原始图片和模板移除后从完整历史目录重建。
+既可作为支持 `SKILL.md` 的本地 Agent Skill 使用，也可直接用 Python 运行。
 
-**能力边界：** 本项目使用主题级模板和内置版式，不保留外部参考 PPT 的母版，也不逐像素复刻其版式。`lab` 模板仅包含匿名化的配色、字体和页面尺寸，不包含原 PPT 文件、Logo 或真实汇报内容。
+**快速导航：** [效果预览](#效果预览) · [功能](#功能) · [快速开始](#快速开始) · [目录结构](#目录结构) · [历史版本与单页重建](#历史版本与单页重建) · [测试](#测试) · [使用注意](#使用注意)
 
 ## 效果预览
 
@@ -18,7 +18,7 @@
 
 ![12 页示例 deck 的效果总览](docs/assets/slides-overview.png)
 
-工作台支持 brief 编辑、模板管理、生成与历史版本预览：
+工作台把 brief 编辑、模板管理、生成和历史版本预览放在同一个界面：
 
 ![组会 PPT 工作台](docs/assets/workbench.png)
 
@@ -33,9 +33,20 @@
 
 </details>
 
-## 环境与安装
+## 功能
 
-已在 **Windows + Python 3.13.9** 环境验证。其他 Python 版本和操作系统尚未全面测试。
+- **10 类内置版式** — 封面、目录、章节页、要点、图片、指标、表格、时间线、结论、下一步计划，字段与选择规则见 [版式库](references/layout-library.md)。
+- **主题级模板** — 用 YAML 定义配色、字体和页面尺寸；内置 `default` 与 `lab`，也可用 Tkinter 向导从自己的 `.pptx` 提取主题。
+- **图形工作台** — brief 编辑、模板管理、生成、历史版本预览与重建一体化。
+- **单页重建** — `--slide N` 原地重绘某一页，保留其余页面（含在 PPT 里做过的视觉微调）。
+- **轻量历史快照** — 保存可重建的 brief、模板、图片与内容结构预览，图片按 SHA-256 跨版本去重，源文件与模板删掉后仍可重建。
+- **生成前校验与输入保护** — 字段缺失、图片不存在、表格行列不匹配等问题会在生成前报错；输出不会覆盖 brief、所选模板或引用图片，单页重建还会校验页数。
+
+**能力边界：** 本项目使用主题级模板和内置版式，不保留外部参考 PPT 的母版，也不逐像素复刻其版式。`lab` 模板仅包含匿名化的配色、字体和页面尺寸，不包含原 PPT 文件、Logo 或真实汇报内容。
+
+## 快速开始
+
+已在 **Windows + Python 3.13.9** 环境验证，其他 Python 版本和操作系统尚未全面测试。
 
 ```bash
 python -m venv .venv
@@ -46,36 +57,62 @@ python -m pip install -r requirements.txt
 
 直接依赖为 `PyYAML`、`Pillow`、`python-pptx`、`lxml`；历史预览另需 `numpy`、`matplotlib`，已一并列入 `requirements.txt`。依赖未固定最低版本，请不要把当前验证环境视为完整兼容矩阵。
 
-GUI 需要 Tkinter。工作台的“打开输出”目前依赖 Windows；其他平台还需自行处理 Tkinter 与中文字体。默认引用微软雅黑、Calibri，**字体并未随仓库分发**，缺失时请调整模板字体。
-
-作为本地技能使用时，将整个目录复制到客户端的技能扫描目录，具体位置和发现方式以客户端文档为准。
-
-## 快速开始
-
-从仓库根目录生成示例 PPT，并写入历史：
+从仓库根目录运行：
 
 ```bash
+# 1) 先用示例 brief 跑通（推荐），再替换成自己的内容
 python scripts/generate_ppt.py assets/demo_brief.yaml -o out/demo.pptx --history-dir out/history
-```
 
-使用 `lab` 主题：
-
-```bash
+# 2) 换主题：内置 lab，或先用向导从自己的 PPTX 提取主题
 python scripts/generate_ppt.py assets/demo_brief.yaml -o out/demo-lab.pptx --template lab
-```
 
-打开工作台或模板向导：
-
-```bash
+# 3) 图形入口：工作台（推荐）与模板向导
 python scripts/workbench.py
 python scripts/template_wizard.py
 ```
 
-`assets/demo_brief.yaml` 中的姓名和实验数值均为演示占位内容。字段规范和版式选择规则见 [SKILL.md](SKILL.md) 与 [版式库](references/layout-library.md)。
+一个最小的 `brief.yaml` 长这样（字段规范见 [SKILL.md](SKILL.md)）：
+
+```yaml
+meta:
+  title: 组会汇报
+sections:
+  - type: cover
+    title: 课题进展汇报
+    presenter: 姓名
+    date: 2026-11
+  - type: points
+    heading: 本阶段工作
+    points:
+      - 完成数据预处理与基线复现
+      - 方法 A 在验证集上提升 2.1%
+  - type: figure
+    heading: 主要结果
+    image: assets/demo_figure.png
+    caption: 方法 A 与基线的对比曲线
+```
+
+`assets/demo_brief.yaml` 中的姓名和实验数值均为演示占位内容。GUI 需要 Tkinter；工作台的“打开输出”目前依赖 Windows，其他平台还需自行处理 Tkinter 与中文字体。默认引用微软雅黑、Calibri，**字体并未随仓库分发**，缺失时请调整模板字体。作为本地技能使用时，把整个目录复制到客户端的技能扫描目录即可，具体位置与发现方式以客户端文档为准。
+
+## 目录结构
+
+```text
+group-meeting-ppt/
+├─ SKILL.md                     Agent Skill 使用规范与工作流
+├─ scripts/
+│  ├─ generate_ppt.py           校验 / 渲染 / 单页重建 / 历史快照
+│  ├─ workbench.py              Tkinter 工作台（推荐入口）
+│  └─ template_wizard.py        从 .pptx 提取主题的模板向导
+├─ templates/                   主题档案（default、lab）
+├─ references/layout-library.md 10 类版式的字段与选择规则
+├─ assets/                      示例 brief 与演示配图
+├─ tests/test_history.py        历史与版式回归测试
+└─ docs/assets/                 README 效果图
+```
 
 ## 历史版本与单页重建
 
-新历史目录结构：
+开启 `--history-dir` 后，每次运行都会写入历史目录：
 
 ```text
 history/
@@ -93,21 +130,19 @@ history/
 - 快照会记录当时的模板与图片哈希，损坏或被替换时拒绝重建。
 - 旧的扁平 `versions/<id>.yaml` 仍可浏览，但当时未归档图片和模板，不能保证脱离原文件重建。
 
-从历史版本全量重建：
+从历史版本全量重建（默认使用该版本归档的模板，只有显式指定 `--template` 才覆盖它；仅指定 `--template-dir` 不会改变这一默认）：
 
 ```bash
 python scripts/generate_ppt.py out/history/versions/<id>/brief.yaml -o out/restored.pptx
 ```
 
-默认使用该版本的归档模板；只有显式指定 `--template` 才覆盖它。仅指定 `--template-dir` 不会改变历史模板的默认选择。
-
-单页重建：
+只改某一节时做单页重建：
 
 ```bash
 python scripts/generate_ppt.py brief.yaml -o out/demo.pptx --slide 2
 ```
 
-单页操作会保留其他页面，但会把历史状态标为需要后续全量重建。它仅适用于由同一 brief 生成、页数和页序未发生外部调整的 PPT；页数不一致时拒绝操作，页序仍需自行核对。
+单页操作会保留其他页面，但会把历史状态标记为需要后续全量重建。它仅适用于由同一 brief 生成、页数和页序未发生外部调整的 PPT；页数不一致时拒绝操作，页序仍需自行核对。
 
 ## 测试
 
@@ -115,17 +150,18 @@ python scripts/generate_ppt.py brief.yaml -o out/demo.pptx --slide 2
 python -m unittest discover -s tests -v
 ```
 
-测试覆盖完整历史重建、图片去重、模板与图片变化、失败回滚、输出哈希校验、单页后全量、归档损坏、旧格式兼容以及 10 类版式。测试输入和输出均位于临时目录，不读取真实组会历史。
+共 25 个用例，覆盖完整历史重建、图片去重、模板与图片变化、失败回滚、输出哈希校验、单页后全量、归档损坏、旧格式兼容与 10 类版式，另含输入保护（拒绝覆盖 brief / 模板 / 引用图片）、版式容量和工作台模板路径安全。测试输入和输出均位于临时目录，不读取真实组会历史。
 
 ## 使用注意
 
-- **输出覆盖：** `-o` 指向的已有输出文件会被覆盖；程序拒绝覆盖当前 brief、所选模板或引用图片。
+- **内容只改 brief：** `brief.yaml` 是内容与结构的唯一事实源，`.pptx` 是派生产物，不从 PPT 反向解析内容。
+- **输出覆盖：** `-o` 指向的已有输出文件会被覆盖；程序拒绝覆盖当前 brief、所选模板或引用图片，但仍建议使用独立的 `.pptx` 输出路径。
 - **版式容量：** 目录、时间线和下一步计划每页最多 12 项，更多内容请拆页；长文字仍可能超出文本框，请打开 PPT 检查。
 - **单页旧图：** 当前实现尚未完整清理被替换图片的 PPTX 内部 relationship。需要彻底删除敏感旧图时，请全量生成到一个新的输出文件。
 - **编辑保存：** 工作台尚未实现未保存内容提醒。打开其他 brief 或关闭窗口前，请先手动保存。
 - **本地隐私：** 生成过程在本机进行；工作台会将最近文件、输出和历史目录的绝对路径保存到用户目录下的 `.bohrium/ppt-workbench.json`，历史目录还会保存 brief 副本。清理本地文件或分享目录前请检查科研内容。
-- 同一输出文件和历史目录应串行生成，不支持多进程同时写入。
-- 参考 PPT 主题提取是基础能力，复杂 Office 主题可能需要手动校正颜色与字体。
+- **串行生成：** 同一输出文件和历史目录应串行生成，不支持多进程同时写入。
+- **主题提取：** 从参考 PPT 提取主题是基础能力，复杂 Office 主题可能需要手动校正颜色与字体。
 
 ## 致谢
 
@@ -136,4 +172,3 @@ python -m unittest discover -s tests -v
 ## 许可证
 
 采用仓库创建时选择的 [MIT License](LICENSE)。字体等第三方资源不随仓库分发，不在该许可证的授权范围内。
-
