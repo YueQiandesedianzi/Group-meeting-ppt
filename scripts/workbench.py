@@ -243,9 +243,11 @@ class Workbench(tk.Tk):
         self.nb = ttk.Notebook(body)
         self.nb.pack(side="left", fill="both", expand=True)
         self._build_tab_brief()
+        self._build_tab_outline()
         self._build_tab_generate()
         self._build_tab_history()
         self._build_tab_template()
+        self.nb.bind("<<NotebookTabChanged>>", self._on_tab_changed)
 
     def _build_statusbar(self):
         self.status_var = tk.StringVar(value="就绪")
@@ -282,7 +284,46 @@ class Workbench(tk.Tk):
         self.validate_var = tk.StringVar(value="")
         ttk.Label(row2, textvariable=self.validate_var).pack(side="left", padx=8)
 
-    # ---------- Tab 2: 生成 ----------
+    # ---------- Tab 2: 大纲 ----------
+    def _build_tab_outline(self):
+        f = ttk.Frame(self.nb, padding=8)
+        self.outline_tab = f
+        self.nb.add(f, text="大纲")
+        top = ttk.Frame(f)
+        top.pack(fill="x", pady=(0, 4))
+        ttk.Button(top, text="从文本刷新", command=self.refresh_outline).pack(side="left")
+        ttk.Label(top, text="双击行可定位到 YAML 原文；右侧按钮直接改写 brief 文本").pack(side="left", padx=8)
+
+        body = ttk.Frame(f)
+        body.pack(fill="both", expand=True)
+
+        self.outline_tree = ttk.Treeview(body, columns=("no", "type", "title"),
+                                         show="headings", selectmode="browse")
+        self.outline_tree.heading("no", text="#")
+        self.outline_tree.heading("type", text="版式")
+        self.outline_tree.heading("title", text="标题")
+        self.outline_tree.column("no", width=44, anchor="center", stretch=False)
+        self.outline_tree.column("type", width=96, anchor="center", stretch=False)
+        self.outline_tree.column("title", width=360)
+        self.outline_tree.bind("<Double-Button-1>", self._on_outline_double)
+        self.outline_tree.pack(side="left", fill="both", expand=True)
+        yscroll = ttk.Scrollbar(body, orient="vertical", command=self.outline_tree.yview)
+        yscroll.pack(side="left", fill="y")
+        self.outline_tree.configure(yscrollcommand=yscroll.set)
+
+        right = ttk.Frame(body, width=150)
+        right.pack(side="left", fill="y", padx=(10, 0))
+        right.pack_propagate(False)
+        ttk.Label(right, text="调整顺序").pack(anchor="w", pady=(0, 2))
+        ttk.Button(right, text="上移", command=lambda: self.move_outline(-1)).pack(fill="x", pady=1)
+        ttk.Button(right, text="下移", command=lambda: self.move_outline(1)).pack(fill="x", pady=1)
+        ttk.Button(right, text="删除该段", command=self.remove_outline).pack(fill="x", pady=1)
+        ttk.Label(right, text="插入版式（追加末尾）").pack(anchor="w", pady=(8, 2))
+        for typ in wl.SECTION_TYPES:
+            ttk.Button(right, text="+ " + wl.type_label(typ),
+                       command=lambda t=typ: self.insert_outline(t)).pack(fill="x", pady=1)
+
+    # ---------- Tab 3: 生成 ----------
     def _build_tab_generate(self):
         f = ttk.Frame(self.nb, padding=12)
         self.nb.add(f, text="生成")
@@ -319,7 +360,7 @@ class Workbench(tk.Tk):
         self.result_text = tk.Text(f, height=8, wrap="word", state="disabled")
         self.result_text.pack(fill="both", expand=True)
 
-    # ---------- Tab 3: 预览与历史 ----------
+    # ---------- Tab 4: 预览与历史 ----------
     def _build_tab_history(self):
         f = ttk.Frame(self.nb, padding=8)
         self.nb.add(f, text="预览与历史")
@@ -336,7 +377,7 @@ class Workbench(tk.Tk):
         self.preview_label = ttk.Label(paned, text="（尚无预览）", anchor="center")
         paned.add(self.preview_label, weight=3)
 
-    # ---------- Tab 4: 模板 ----------
+    # ---------- Tab 5: 模板 ----------
     def _build_tab_template(self):
         f = ttk.Frame(self.nb, padding=12)
         self.nb.add(f, text="模板")
@@ -454,6 +495,7 @@ class Workbench(tk.Tk):
         self.refresh_left_templates()
         self.refresh_template_combo()
         self.refresh_history()
+        self.refresh_outline()
         self.update_status()
 
     def update_status(self):
@@ -483,6 +525,7 @@ class Workbench(tk.Tk):
             self.recent_briefs.insert(0, path)
         self._dirty = False
         self.refresh_left_briefs()
+        self.refresh_outline()
         self._set_title()
         self.update_status()
 
@@ -666,6 +709,114 @@ class Workbench(tk.Tk):
         except ValueError as e:
             return None, str(e)
         return brief, None
+
+    def _parsed_brief(self):
+        """只做 YAML 解析，不校验，供大纲在内容未填全时仍可显示。"""
+        import yaml
+        try:
+            return yaml.safe_load(self.brief_text.get("1.0", "end")), None
+        except yaml.YAMLError as e:
+            mark = getattr(e, "problem_mark", None)
+            where = f"第 {mark.line + 1} 行 " if mark is not None else ""
+            return None, f"YAML 语法错误：{where}{getattr(e, 'problem', None) or e}"
+
+    # ---------- 大纲 ----------
+    def refresh_outline(self, select=None):
+        if not hasattr(self, "outline_tree"):
+            return
+        self.outline_tree.delete(*self.outline_tree.get_children())
+        brief, error = self._parsed_brief()
+        if error or not isinstance(brief, dict):
+            self.status_var.set(f"大纲不可用：{error or 'brief 顶层必须是映射'}")
+            return
+        for row in wl.section_outline(brief):
+            self.outline_tree.insert("", "end", iid=str(row["index"]),
+                                     values=(row["index"], row["label"], row["title"]))
+        children = self.outline_tree.get_children()
+        if select is not None and str(select) in children:
+            self.outline_tree.selection_set(str(select))
+            self.outline_tree.see(str(select))
+        self.status_var.set(f"大纲：{len(children)} 段")
+
+    def _outline_selected_index(self):
+        sel = self.outline_tree.selection()
+        if not sel:
+            return None
+        try:
+            return int(sel[0]) - 1
+        except ValueError:
+            return None
+
+    def _replace_brief_text(self, text):
+        """整段替换编辑器内容，并同步脏标记与大纲。"""
+        self._loading = True
+        try:
+            self.brief_text.delete("1.0", "end")
+            self.brief_text.insert("1.0", text)
+            self.brief_text.edit_modified(False)
+        finally:
+            self._loading = False
+        self._dirty = True
+        self._set_title()
+
+    def move_outline(self, delta):
+        index = self._outline_selected_index()
+        if index is None:
+            messagebox.showinfo("提示", "请先在大纲里选一段")
+            return
+        text = self.brief_text.get("1.0", "end-1c")
+        new_text = wl.move_section_text(text, index, delta)
+        if new_text == text:
+            return
+        self._replace_brief_text(new_text)
+        self.refresh_outline(select=index + delta + 1)
+
+    def remove_outline(self):
+        index = self._outline_selected_index()
+        if index is None:
+            messagebox.showinfo("提示", "请先在大纲里选一段")
+            return
+        if not messagebox.askyesno("删除该段", f"删除第 {index + 1} 段？文本区可用 Ctrl+Z 撤销。"):
+            return
+        text = self.brief_text.get("1.0", "end-1c")
+        new_text = wl.remove_section_text(text, index)
+        if new_text == text:
+            return
+        self._replace_brief_text(new_text)
+        self.refresh_outline(select=index + 1)
+
+    def insert_outline(self, typ):
+        text = self.brief_text.get("1.0", "end-1c")
+        try:
+            new_text = wl.append_snippet(text, typ)
+        except ValueError as e:
+            messagebox.showerror("无法插入", str(e))
+            return
+        self._replace_brief_text(new_text)
+        brief, error = self._parsed_brief()
+        rows = wl.section_outline(brief) if not error else []
+        self.refresh_outline(select=len(rows) or None)
+        if rows:
+            self.status_var.set(f"已追加「{wl.type_label(typ)}」骨架，请补齐第 {len(rows)} 段的占位内容")
+
+    def _on_outline_double(self, event=None):
+        index = self._outline_selected_index()
+        if index is None:
+            return
+        spans = wl.section_spans(self.brief_text.get("1.0", "end-1c"))
+        if not (0 <= index < len(spans)):
+            return
+        start, end = spans[index]
+        self.brief_text.tag_remove("sel", "1.0", "end")
+        self.brief_text.tag_add("sel", f"{start + 1}.0", f"{end}.end")
+        self.brief_text.mark_set("insert", f"{start + 1}.0")
+        self.brief_text.see(f"{start + 1}.0")
+        self.brief_text.focus_set()
+        self.nb.select(0)
+
+    def _on_tab_changed(self, event=None):
+        if hasattr(self, "outline_tab") and self.nb.select() == str(self.outline_tab):
+            self.refresh_outline()
 
     def _set_busy(self, busy):
         for btn in self._generate_buttons:

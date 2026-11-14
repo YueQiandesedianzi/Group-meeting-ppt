@@ -74,5 +74,135 @@ class PreflightTextTests(unittest.TestCase):
         self.assertIn("没有发现", text)
 
 
+
+
+SAMPLE = """meta:
+  title: 测试
+sections:
+  - type: cover
+    title: 封面
+
+  - type: points
+    heading: 方法
+    points:
+      - A
+
+  - type: conclusion
+    heading: 小结
+    points:
+      - B
+
+notes: keep me
+"""
+
+
+def parse(text):
+    import yaml
+    return yaml.safe_load(text)
+
+
+class SectionOutlineTests(unittest.TestCase):
+    def test_rows_have_index_type_label_and_title(self):
+        rows = wl.section_outline(parse(SAMPLE))
+        self.assertEqual([r["index"] for r in rows], [1, 2, 3])
+        self.assertEqual([r["type"] for r in rows], ["cover", "points", "conclusion"])
+        self.assertEqual([r["label"] for r in rows], ["封面", "要点", "结论"])
+        self.assertEqual([r["title"] for r in rows], ["封面", "方法", "小结"])
+
+    def test_unknown_and_broken_sections(self):
+        rows = wl.section_outline({"sections": [{"type": "weird"}, "nope"]})
+        self.assertEqual(rows[0]["label"], "weird")
+        self.assertEqual(rows[1]["label"], "未知")
+
+    def test_bad_input(self):
+        self.assertEqual(wl.section_outline(None), [])
+        self.assertEqual(wl.section_outline({"sections": 3}), [])
+
+    def test_type_label_fallback(self):
+        self.assertEqual(wl.type_label("table"), "表格")
+        self.assertEqual(wl.type_label("unknown"), "unknown")
+        self.assertEqual(wl.type_label(None), "未知")
+
+
+class SectionSpansTests(unittest.TestCase):
+    def test_three_spans_match_parsed_sections(self):
+        text = SAMPLE.rstrip("\n") + "\n"
+        spans = wl.section_spans(text)
+        self.assertEqual(len(spans), 3)
+        lines = text.split("\n")
+        for (start, end), typ in zip(spans, ["cover", "points", "conclusion"]):
+            block = "\n".join(lines[start:end])
+            self.assertIn(f"type: {typ}", block)
+
+    def test_no_sections_key(self):
+        self.assertEqual(wl.section_spans("meta:\n  title: x\n"), [])
+
+
+class MoveRemoveTests(unittest.TestCase):
+    def test_move_down_swaps_neighbours_and_keeps_tail(self):
+        moved = wl.move_section_text(SAMPLE, 0, 1)
+        types = [s["type"] for s in parse(moved)["sections"]]
+        self.assertEqual(types, ["points", "cover", "conclusion"])
+        self.assertIn("notes: keep me", moved)
+
+    def test_move_up_and_boundaries(self):
+        moved = wl.move_section_text(SAMPLE, 2, -1)
+        self.assertEqual([s["type"] for s in parse(moved)["sections"]],
+                         ["cover", "conclusion", "points"])
+        self.assertEqual(wl.move_section_text(SAMPLE, 0, -1), SAMPLE)
+        self.assertEqual(wl.move_section_text(SAMPLE, 2, 1), SAMPLE)
+        self.assertEqual(wl.move_section_text(SAMPLE, 9, 1), SAMPLE)
+
+    def test_remove_section(self):
+        fewer = wl.remove_section_text(SAMPLE, 1)
+        self.assertEqual([s["type"] for s in parse(fewer)["sections"]], ["cover", "conclusion"])
+        self.assertEqual(wl.remove_section_text(SAMPLE, 5), SAMPLE)
+
+    def test_unparseable_text_is_untouched(self):
+        self.assertEqual(wl.move_section_text("meta:\n  title: x\n", 0, 1), "meta:\n  title: x\n")
+        self.assertEqual(wl.remove_section_text("meta:\n  title: x\n", 0), "meta:\n  title: x\n")
+
+
+class SnippetTests(unittest.TestCase):
+    def test_append_adds_one_section_of_each_type(self):
+        text = SAMPLE
+        for i, typ in enumerate(wl.SECTION_TYPES, start=4):
+            text = wl.append_snippet(text, typ)
+            sections = parse(text)["sections"]
+            self.assertEqual(len(sections), i)
+            self.assertEqual(sections[-1]["type"], typ)
+        self.assertIn("notes: keep me", text)
+
+    def test_append_keeps_yaml_valid_for_every_snippet(self):
+        import base64
+        import os
+        import sys
+        import tempfile
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+        import generate_ppt as g
+        png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8AARAAB/2wD5QAAAABJRU5ErkJggg==")
+        with tempfile.TemporaryDirectory() as tmp:
+            with open(os.path.join(tmp, "图片文件名.png"), "wb") as fh:
+                fh.write(png)
+            for typ in wl.SECTION_TYPES:
+                with self.subTest(typ=typ):
+                    text = wl.append_snippet(SAMPLE, typ)
+                    g.validate(parse(text), tmp)
+
+    def test_unknown_type_raises(self):
+        with self.assertRaises(ValueError):
+            wl.append_snippet(SAMPLE, "poster")
+
+    def test_missing_sections_raises(self):
+        with self.assertRaises(ValueError):
+            wl.append_snippet("meta:\n  title: x\n", "cover")
+
+    def test_append_into_empty_sections(self):
+        text = "meta:\n  title: x\nsections:\n"
+        out = wl.append_snippet(text, "cover")
+        self.assertEqual(len(parse(out)["sections"]), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

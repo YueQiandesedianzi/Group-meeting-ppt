@@ -18,7 +18,8 @@ description: 生成可编辑的科研组会汇报 PPT（.pptx）。按 brief.yam
 
 - `scripts/generate_ppt.py`：生成/校验/单页重建/快照。
 - `scripts/template_wizard.py`：Tkinter 图形界面向导，导入/选择/配置模板。
-- `scripts/workbench.py`：统一工作台（推荐 GUI），集成 brief 编辑 / 生成 / 历史预览 / 模板管理。
+- `scripts/workbench.py`：统一工作台（推荐 GUI），集成 brief 编辑 / 大纲调整 / 生成 / 历史预览 / 模板管理。
+- `scripts/workbench_logic.py`：工作台纯逻辑（大纲解析、版式骨架、段落增删移、容量提醒），供 GUI 与测试共用。
 - `templates/*.yaml`：模板档案（页面尺寸 + 配色 + 字体），内置 `default.yaml`。
 - `references/layout-library.md`：10 类版式字段与推荐规则（起草 brief 时查阅）。
 - `assets/demo_brief.yaml`：完整示例 brief，可作为模板。
