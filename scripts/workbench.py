@@ -748,7 +748,12 @@ class Workbench(tk.Tk):
             return None
 
     def _replace_brief_text(self, text):
-        """整段替换编辑器内容，并同步脏标记与大纲。"""
+        """整段替换编辑器内容，并同步脏标记与大纲。
+
+        delete + insert 被 edit_separator 归成一次编辑，Ctrl+Z 可整体撤销。
+        """
+        self.brief_text.configure(autoseparators=False)
+        self.brief_text.edit_separator()
         self._loading = True
         try:
             self.brief_text.delete("1.0", "end")
@@ -756,6 +761,8 @@ class Workbench(tk.Tk):
             self.brief_text.edit_modified(False)
         finally:
             self._loading = False
+            self.brief_text.edit_separator()
+            self.brief_text.configure(autoseparators=True)
         self._dirty = True
         self._set_title()
 
