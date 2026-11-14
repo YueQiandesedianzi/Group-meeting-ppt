@@ -1,0 +1,414 @@
+{
+  "before": "E:\\测试\\group-meeting-ppt-publish\\v2\\samples\\reference-template.pptx",
+  "after": "E:\\测试\\group-meeting-ppt-publish\\v2\\samples\\hand-edited.pptx",
+  "totals": {
+    "rewritten": 6,
+    "identical": 43,
+    "added": 4
+  },
+  "by_category": {
+    "other": {
+      "rewritten": 2,
+      "identical": 4
+    },
+    "package-rels": {
+      "identical": 1
+    },
+    "docProps": {
+      "identical": 3
+    },
+    "part-rels": {
+      "rewritten": 1
+    },
+    "media": {
+      "identical": 3
+    },
+    "layout": {
+      "identical": 22
+    },
+    "master": {
+      "identical": 2
+    },
+    "slide": {
+      "identical": 7,
+      "added": 4,
+      "rewritten": 3
+    },
+    "theme": {
+      "identical": 1
+    }
+  },
+  "parts": [
+    {
+      "part": "[Content_Types].xml",
+      "category": "other",
+      "status": "rewritten",
+      "bytes_before": 3828,
+      "bytes_after": 4088
+    },
+    {
+      "part": "_rels/.rels",
+      "category": "package-rels",
+      "status": "identical",
+      "bytes_before": 737,
+      "bytes_after": 737
+    },
+    {
+      "part": "docProps/app.xml",
+      "category": "docProps",
+      "status": "identical",
+      "bytes_before": 1133,
+      "bytes_after": 1133
+    },
+    {
+      "part": "docProps/core.xml",
+      "category": "docProps",
+      "status": "identical",
+      "bytes_before": 731,
+      "bytes_after": 731
+    },
+    {
+      "part": "docProps/thumbnail.jpeg",
+      "category": "docProps",
+      "status": "identical",
+      "bytes_before": 4067,
+      "bytes_after": 4067
+    },
+    {
+      "part": "ppt/_rels/presentation.xml.rels",
+      "category": "part-rels",
+      "status": "rewritten",
+      "bytes_before": 1671,
+      "bytes_after": 1939
+    },
+    {
+      "part": "ppt/media/image1.png",
+      "category": "media",
+      "status": "identical",
+      "bytes_before": 3422,
+      "bytes_after": 3422
+    },
+    {
+      "part": "ppt/media/image2.png",
+      "category": "media",
+      "status": "identical",
+      "bytes_before": 5610,
+      "bytes_after": 5610
+    },
+    {
+      "part": "ppt/media/image3.png",
+      "category": "media",
+      "status": "identical",
+      "bytes_before": 3702,
+      "bytes_after": 3702
+    },
+    {
+      "part": "ppt/presProps.xml",
+      "category": "other",
+      "status": "identical",
+      "bytes_before": 649,
+      "bytes_after": 649
+    },
+    {
+      "part": "ppt/presentation.xml",
+      "category": "other",
+      "status": "rewritten",
+      "bytes_before": 3379,
+      "bytes_after": 3443
+    },
+    {
+      "part": "ppt/printerSettings/printerSettings1.bin",
+      "category": "other",
+      "status": "identical",
+      "bytes_before": 9395,
+      "bytes_after": 9395
+    },
+    {
+      "part": "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 310,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slideLayouts/_rels/slideLayout10.xml.rels",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 310,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slideLayouts/_rels/slideLayout11.xml.rels",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 310,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slideLayouts/_rels/slideLayout2.xml.rels",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 310,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slideLayouts/_rels/slideLayout3.xml.rels",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 310,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slideLayouts/_rels/slideLayout4.xml.rels",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 310,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slideLayouts/_rels/slideLayout5.xml.rels",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 310,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slideLayouts/_rels/slideLayout6.xml.rels",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 310,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slideLayouts/_rels/slideLayout7.xml.rels",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 310,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slideLayouts/_rels/slideLayout8.xml.rels",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 310,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slideLayouts/_rels/slideLayout9.xml.rels",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 310,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slideLayouts/slideLayout1.xml",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 4357,
+      "bytes_after": 4357
+    },
+    {
+      "part": "ppt/slideLayouts/slideLayout10.xml",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 3021,
+      "bytes_after": 3021
+    },
+    {
+      "part": "ppt/slideLayouts/slideLayout11.xml",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 3245,
+      "bytes_after": 3245
+    },
+    {
+      "part": "ppt/slideLayouts/slideLayout2.xml",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 2966,
+      "bytes_after": 2966
+    },
+    {
+      "part": "ppt/slideLayouts/slideLayout3.xml",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 4440,
+      "bytes_after": 4440
+    },
+    {
+      "part": "ppt/slideLayouts/slideLayout4.xml",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 4712,
+      "bytes_after": 4712
+    },
+    {
+      "part": "ppt/slideLayouts/slideLayout5.xml",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 7222,
+      "bytes_after": 7222
+    },
+    {
+      "part": "ppt/slideLayouts/slideLayout6.xml",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 2232,
+      "bytes_after": 2232
+    },
+    {
+      "part": "ppt/slideLayouts/slideLayout7.xml",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 1895,
+      "bytes_after": 1895
+    },
+    {
+      "part": "ppt/slideLayouts/slideLayout8.xml",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 4802,
+      "bytes_after": 4802
+    },
+    {
+      "part": "ppt/slideLayouts/slideLayout9.xml",
+      "category": "layout",
+      "status": "identical",
+      "bytes_before": 4657,
+      "bytes_after": 4657
+    },
+    {
+      "part": "ppt/slideMasters/_rels/slideMaster1.xml.rels",
+      "category": "master",
+      "status": "identical",
+      "bytes_before": 2126,
+      "bytes_after": 2126
+    },
+    {
+      "part": "ppt/slideMasters/slideMaster1.xml",
+      "category": "master",
+      "status": "identical",
+      "bytes_before": 13687,
+      "bytes_after": 13687
+    },
+    {
+      "part": "ppt/slides/_rels/slide1.xml.rels",
+      "category": "slide",
+      "status": "identical",
+      "bytes_before": 310,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slides/_rels/slide2.xml.rels",
+      "category": "slide",
+      "status": "identical",
+      "bytes_before": 310,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slides/_rels/slide3.xml.rels",
+      "category": "slide",
+      "status": "identical",
+      "bytes_before": 445,
+      "bytes_after": 445
+    },
+    {
+      "part": "ppt/slides/_rels/slide4.xml.rels",
+      "category": "slide",
+      "status": "identical",
+      "bytes_before": 580,
+      "bytes_after": 580
+    },
+    {
+      "part": "ppt/slides/_rels/slide5.xml.rels",
+      "category": "slide",
+      "status": "identical",
+      "bytes_before": 310,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slides/_rels/slide6.xml.rels",
+      "category": "slide",
+      "status": "added",
+      "bytes_before": null,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slides/_rels/slide7.xml.rels",
+      "category": "slide",
+      "status": "added",
+      "bytes_before": null,
+      "bytes_after": 310
+    },
+    {
+      "part": "ppt/slides/slide1.xml",
+      "category": "slide",
+      "status": "rewritten",
+      "bytes_before": 2061,
+      "bytes_after": 2073
+    },
+    {
+      "part": "ppt/slides/slide2.xml",
+      "category": "slide",
+      "status": "identical",
+      "bytes_before": 2933,
+      "bytes_after": 2933
+    },
+    {
+      "part": "ppt/slides/slide3.xml",
+      "category": "slide",
+      "status": "rewritten",
+      "bytes_before": 2489,
+      "bytes_after": 2482
+    },
+    {
+      "part": "ppt/slides/slide4.xml",
+      "category": "slide",
+      "status": "rewritten",
+      "bytes_before": 1934,
+      "bytes_after": 3266
+    },
+    {
+      "part": "ppt/slides/slide5.xml",
+      "category": "slide",
+      "status": "identical",
+      "bytes_before": 3144,
+      "bytes_after": 3144
+    },
+    {
+      "part": "ppt/slides/slide6.xml",
+      "category": "slide",
+      "status": "added",
+      "bytes_before": null,
+      "bytes_after": 2073
+    },
+    {
+      "part": "ppt/slides/slide7.xml",
+      "category": "slide",
+      "status": "added",
+      "bytes_before": null,
+      "bytes_after": 1271
+    },
+    {
+      "part": "ppt/tableStyles.xml",
+      "category": "other",
+      "status": "identical",
+      "bytes_before": 182,
+      "bytes_after": 182
+    },
+    {
+      "part": "ppt/theme/theme1.xml",
+      "category": "theme",
+      "status": "identical",
+      "bytes_before": 7655,
+      "bytes_after": 7655
+    },
+    {
+      "part": "ppt/viewProps.xml",
+      "category": "other",
+      "status": "identical",
+      "bytes_before": 898,
+      "bytes_after": 898
+    }
+  ]
+}

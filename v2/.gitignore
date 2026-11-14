@@ -1,0 +1,4 @@
+# 派生文件：往返产物与渲染输出不入库
+*.roundtrip.pptx
+render-*/
+__pycache__/

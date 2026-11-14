@@ -1,0 +1,64 @@
+{
+  "template": "reference-template.pptx",
+  "slide_size_in": [
+    13.333,
+    8.333
+  ],
+  "mode": "sample-pages",
+  "fixed": {
+    "master": [
+      "logo",
+      "footer",
+      "accent-line"
+    ],
+    "page": {
+      "2": [
+        "page-band"
+      ]
+    }
+  },
+  "pages": [
+    {
+      "index": 1,
+      "use": "cover",
+      "regions": {
+        "title": "page-title",
+        "meta": "static-text"
+      }
+    },
+    {
+      "index": 2,
+      "use": "body",
+      "regions": {
+        "title": "page-title",
+        "content": "bullets"
+      }
+    },
+    {
+      "index": 3,
+      "use": "figure",
+      "regions": {
+        "title": "page-title",
+        "image": "picture",
+        "caption": "static-text"
+      }
+    },
+    {
+      "index": 4,
+      "use": "two-figure",
+      "regions": {
+        "title": "page-title",
+        "images": "picture"
+      }
+    },
+    {
+      "index": 5,
+      "use": "summary",
+      "regions": {
+        "title": "page-title",
+        "table": "table"
+      }
+    }
+  ],
+  "free_regions": []
+}
