@@ -204,5 +204,51 @@ class SnippetTests(unittest.TestCase):
         self.assertEqual(len(parse(out)["sections"]), 1)
 
 
+
+
+class VersionIdTests(unittest.TestCase):
+    def test_plain_ids_are_safe(self):
+        for vid in ("20261113-215054-304180-30fcd72f", "实验室-v1", "a.b_c"):
+            self.assertTrue(wl.is_safe_version_id(vid), vid)
+
+    def test_path_like_ids_are_rejected(self):
+        for vid in ("", "  x", "../outside", "..\\outside", "/tmp/x", "C:\\x", "a/b",
+                    "a\\b", ".", "..", "a:b", None, 3):
+            self.assertFalse(wl.is_safe_version_id(vid), repr(vid))
+
+
+class VersionLabelTests(unittest.TestCase):
+    def test_new_snapshot_label(self):
+        label = wl.id_timestamp("20261113-215054-304180-30fcd72f")
+        self.assertEqual(label, "2026-11-13 21:50")
+        version = {"id": "20261113-215054-304180-30fcd72f", "template_name": "lab",
+                   "pages": 12, "generation_mode": "full"}
+        self.assertEqual(wl.version_label(version), "2026-11-13 21:50 · lab · 12 页 · 完整生成")
+
+    def test_slide_mode_and_legacy_and_error(self):
+        slide = {"id": "20261113-215054-304180-30fcd72f", "pages": 3, "generation_mode": "slide"}
+        self.assertIn("单页重建", wl.version_label(slide))
+        legacy = {"id": "20261113-215054-304180-30fcd72f", "legacy": True}
+        self.assertIn("旧格式", wl.version_label(legacy))
+        broken = {"id": "20261113-215054-304180-30fcd72f", "error": "缺少 manifest"}
+        self.assertIn("无法读取", wl.version_label(broken))
+
+    def test_unknown_id_kept_as_is(self):
+        self.assertEqual(wl.id_timestamp("custom-name"), "")
+        self.assertEqual(wl.version_label({"id": "custom-name"}), "custom-name")
+
+
+class HistoryStatusTests(unittest.TestCase):
+    def test_known_statuses(self):
+        self.assertIn("完整", wl.history_status_text({"status": "full"}))
+        self.assertIn("待全量", wl.history_status_text({"status": "partial"}))
+        self.assertIn("历史待写入", wl.history_status_text({"status": "history_pending"}))
+
+    def test_missing_or_unknown_marker(self):
+        self.assertEqual(wl.history_status_text(None), "尚无生成记录")
+        self.assertEqual(wl.history_status_text({}), "尚无生成记录")
+        self.assertIn("weird", wl.history_status_text({"status": "weird"}))
+
+
 if __name__ == "__main__":
     unittest.main()

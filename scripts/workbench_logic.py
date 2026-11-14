@@ -292,3 +292,66 @@ def append_snippet(text, typ):
     head, blocks, tail = parts
     blocks.append(SNIPPETS[typ].split("\n"))
     return _rebuild(head, blocks, tail)
+
+
+# ---------------- 历史列表与版本 id ----------------
+
+_MODE_LABELS = {"full": "完整生成", "slide": "单页重建"}
+_STATUS_LABELS = {
+    "full": "完整（输入未变时可跳过重建）",
+    "partial": "单页生成后待全量重建",
+    "history_pending": "输出已保存，历史待写入",
+}
+
+
+def is_safe_version_id(version_id):
+    """历史目录里的版本 id 必须是单个、可移植的目录名。"""
+    if not isinstance(version_id, str) or not version_id or version_id != version_id.strip():
+        return False
+    if version_id in (".", "..") or version_id.startswith(".."):
+        return False
+    if any(ch in version_id for ch in ("/", "\\", os.sep, os.altsep or "/")):
+        return False
+    if ":" in version_id or "\0" in version_id:
+        return False
+    return True
+
+
+def id_timestamp(version_id):
+    """把 id 前缀 YYYYMMDD-HHMMSS 格式化为可读时间，解析失败返回空串。"""
+    import re
+    match = re.match(r"^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})", version_id or "")
+    if not match:
+        return ""
+    year, month, day, hour, minute = match.groups()[:5]
+    return f"{year}-{month}-{day} {hour}:{minute}"
+
+
+def version_label(version):
+    """历史列表一行的显示文本。"""
+    version_id = version.get("id") or ""
+    stamp = id_timestamp(version_id) or version_id
+    if version.get("legacy"):
+        return f"{stamp} · 旧格式（无归档）"
+    if version.get("error"):
+        return f"{stamp} · 无法读取"
+    parts = [stamp]
+    if version.get("template_name"):
+        parts.append(str(version["template_name"]))
+    pages = version.get("pages")
+    if isinstance(pages, int) and pages > 0:
+        parts.append(f"{pages} 页")
+    mode = _MODE_LABELS.get(version.get("generation_mode"))
+    if mode:
+        parts.append(mode)
+    return " · ".join(parts)
+
+
+def history_status_text(marker):
+    """把 .last_generated.json 里的状态翻译成一句话。"""
+    if not isinstance(marker, dict):
+        return "尚无生成记录"
+    status = marker.get("status")
+    if not status:
+        return "尚无生成记录"
+    return "上次生成：" + _STATUS_LABELS.get(status, str(status))

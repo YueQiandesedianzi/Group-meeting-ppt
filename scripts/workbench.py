@@ -7,7 +7,10 @@
 import os
 import sys
 import json
+import queue
+import shutil
 import subprocess
+import threading
 from types import SimpleNamespace
 
 import tkinter as tk
@@ -124,6 +127,12 @@ def list_versions(history_dir):
                 if not os.path.isfile(os.path.join(path, "template.yaml")):
                     raise ValueError("版本缺少 template.yaml")
                 version["template_name"] = manifest.get("template", {}).get("name", "未命名")
+                version["created_at"] = manifest.get("created_at")
+                version["generation_mode"] = manifest.get("generation_mode")
+                try:
+                    version["pages"] = len(g.load_yaml(snap).get("sections", []))
+                except Exception:
+                    version["pages"] = None
             except (OSError, ValueError, AttributeError) as e:
                 version["error"] = str(e)
         out.append(version)
@@ -163,6 +172,13 @@ class Workbench(tk.Tk):
         self._dirty = False
         self._loading = False
         self._generate_buttons = []
+        self._outline_job = None
+        self._generating = False
+        self._gen_abandon = False
+        self._gen_queue = queue.Queue()
+        self._preview_base = None
+        self._preview_path = None
+        self._preview_zoom = 1
         geometry = st.get("geometry")
         if isinstance(geometry, str) and "x" in geometry:
             try:
@@ -345,9 +361,11 @@ class Workbench(tk.Tk):
         ttk.Entry(form, textvariable=self.history_var, width=42).grid(row=2, column=1, sticky="w")
         ttk.Button(form, text="浏览…", command=self.browse_history).grid(row=2, column=2, padx=4)
 
-        ttk.Label(form, text="单页 N").grid(row=3, column=0, sticky="w", pady=4)
+        ttk.Label(form, text="单页重建").grid(row=3, column=0, sticky="w", pady=4)
         self.slide_var = tk.StringVar(value="")
-        ttk.Entry(form, textvariable=self.slide_var, width=8).grid(row=3, column=1, sticky="w")
+        self.slide_combo = ttk.Combobox(form, textvariable=self.slide_var, width=32, values=[])
+        self.slide_combo.grid(row=3, column=1, sticky="w")
+        ttk.Label(form, text="可直接填页码，或从下拉选段").grid(row=3, column=2, sticky="w", padx=4)
 
         btns = ttk.Frame(f)
         btns.pack(fill="x", pady=8)
@@ -355,6 +373,10 @@ class Workbench(tk.Tk):
         full_btn.pack(side="left", padx=2)
         slide_btn = ttk.Button(btns, text="单页重建", command=self.do_generate_slide)
         slide_btn.pack(side="left", padx=2)
+        self.abandon_btn = ttk.Button(btns, text="放弃等待", command=self.abandon_generation, state="disabled")
+        self.abandon_btn.pack(side="left", padx=8)
+        self.progress = ttk.Progressbar(btns, mode="indeterminate", length=150)
+        self.progress.pack(side="left")
         self._generate_buttons = [full_btn, slide_btn]
 
         self.result_text = tk.Text(f, height=8, wrap="word", state="disabled")
@@ -368,10 +390,20 @@ class Workbench(tk.Tk):
         top.pack(fill="x", pady=(0, 4))
         ttk.Button(top, text="刷新列表", command=self.refresh_history).pack(side="left")
         ttk.Button(top, text="从该版本重建…", command=self.rebuild_version).pack(side="left", padx=6)
+        ttk.Button(top, text="打开预览图", command=self.open_preview).pack(side="left")
+        ttk.Button(top, text="打开版本目录", command=self.open_version_dir).pack(side="left", padx=6)
+        ttk.Button(top, text="删除该版本", command=self.delete_version).pack(side="left")
+        ttk.Label(top, text="缩放").pack(side="left", padx=(10, 2))
+        ttk.Button(top, text="－", width=3, command=lambda: self.zoom_preview(-1)).pack(side="left")
+        ttk.Button(top, text="＋", width=3, command=lambda: self.zoom_preview(1)).pack(side="left")
+        ttk.Button(top, text="适应", command=self.fit_preview).pack(side="left", padx=2)
+
+        self.history_status_var = tk.StringVar(value="尚无生成记录")
+        ttk.Label(f, textvariable=self.history_status_var).pack(anchor="w", pady=(0, 4))
 
         paned = ttk.PanedWindow(f, orient="horizontal")
         paned.pack(fill="both", expand=True)
-        self.version_list = tk.Listbox(paned, width=30)
+        self.version_list = tk.Listbox(paned, width=36)
         self.version_list.bind("<<ListboxSelect>>", lambda e: self.on_version_select())
         paned.add(self.version_list, weight=1)
         self.preview_label = ttk.Label(paned, text="（尚无预览）", anchor="center")
@@ -496,6 +528,7 @@ class Workbench(tk.Tk):
         self.refresh_template_combo()
         self.refresh_history()
         self.refresh_outline()
+        self.refresh_slide_choices()
         self.update_status()
 
     def update_status(self):
@@ -526,6 +559,7 @@ class Workbench(tk.Tk):
         self._dirty = False
         self.refresh_left_briefs()
         self.refresh_outline()
+        self.refresh_slide_choices()
         self._set_title()
         self.update_status()
 
@@ -652,6 +686,9 @@ class Workbench(tk.Tk):
         if warnings and not messagebox.askyesno("生成前检查", wl.format_preflight(pages, warnings)):
             self._set_result(f"已取消生成（{len(warnings)} 条提醒未处理）。\n")
             return
+        if self._generating:
+            messagebox.showinfo("提示", "已有生成任务在进行，请等待或点击「放弃等待」")
+            return
         summary = f"预检：{pages} 页" + (f"，{len(warnings)} 条提醒" if warnings else "，无提醒")
         self._set_result(summary + "\n")
         output = self.output_var.get().strip()
@@ -660,29 +697,69 @@ class Workbench(tk.Tk):
             self.output_var.set(output)
         template = self.template_var.get()
         history = self.history_var.get().strip() or None
+        self._start_generation(slide, output, template, history)
+
+    def _start_generation(self, slide, output, template, history):
+        """渲染放到工作线程，主线程用队列轮询取回结果。"""
+        self._generating = True
+        self._gen_abandon = False
         self._set_busy(True)
+        brief_path = self.brief_path
+
+        def work():
+            try:
+                pages, template_name = run_generate(brief_path, output, template,
+                                                    slide=slide, history_dir=history)
+                self._gen_queue.put(("ok", pages, template_name, output))
+            except Exception as e:
+                self._gen_queue.put(("err", str(e)))
+
+        threading.Thread(target=work, daemon=True).start()
+        self.after(120, self._poll_generation)
+
+    def _poll_generation(self):
         try:
-            n, tn = run_generate(self.brief_path, output, template, slide=slide, history_dir=history)
-        except Exception as e:
-            self._set_result(f"失败：{e}\n")
-            messagebox.showerror("生成失败", str(e))
+            result = self._gen_queue.get_nowait()
+        except queue.Empty:
+            if not self._generating:
+                return
+            try:
+                self.after(120, self._poll_generation)
+            except tk.TclError:
+                return
             return
-        finally:
-            self._set_busy(False)
-        self.template_name = template
-        self._set_result(f"成功：共 {n} 页 · 模板 {tn} → {output}\n")
-        if history:
-            self.refresh_history()
+        self._generating = False
+        self._set_busy(False)
+        if self._gen_abandon:
+            self._set_result("已放弃等待；后台任务仍可能写完文件。\n")
+            return
+        if result[0] == "err":
+            self._set_result(f"失败：{result[1]}\n")
+            messagebox.showerror("生成失败", result[1])
+            return
+        _, pages, template_name, output = result
+        self.template_name = self.template_var.get()
+        self._set_result(f"成功：共 {pages} 页 · 模板 {template_name} → {output}\n")
+        self.refresh_history()
         self.refresh_left_templates()
         self.refresh_template_combo()
         self.update_status()
 
-    def do_generate_slide(self):
-        s = self.slide_var.get().strip()
-        if not s.isdigit():
-            messagebox.showwarning("提示", "请输入要重建的页码 N")
+    def abandon_generation(self):
+        if not self._generating:
             return
-        self.do_generate(int(s))
+        self._gen_abandon = True
+        self._generating = False
+        self._set_busy(False)
+        self._set_result("已放弃等待；后台任务仍可能写完文件，稍后请刷新历史。\n")
+
+    def do_generate_slide(self):
+        raw = self.slide_var.get().strip()
+        head = raw.split(".")[0].strip() if raw else ""
+        if not head.isdigit():
+            messagebox.showwarning("提示", "请选择或输入要重建的页码 N")
+            return
+        self.do_generate(int(head))
 
     def _set_result(self, msg):
         self.result_text.configure(state="normal")
@@ -724,6 +801,10 @@ class Workbench(tk.Tk):
     def refresh_outline(self, select=None):
         if not hasattr(self, "outline_tree"):
             return
+        if select is None:
+            current = self.outline_tree.selection()
+            if current:
+                select = current[0]
         self.outline_tree.delete(*self.outline_tree.get_children())
         brief, error = self._parsed_brief()
         if error or not isinstance(brief, dict):
@@ -737,6 +818,36 @@ class Workbench(tk.Tk):
             self.outline_tree.selection_set(str(select))
             self.outline_tree.see(str(select))
         self.status_var.set(f"大纲：{len(children)} 段")
+
+    def _schedule_outline_refresh(self):
+        """文本改动后延迟重建大纲，避免每次按键都重解析。"""
+        if self._outline_job is not None:
+            try:
+                self.after_cancel(self._outline_job)
+            except (tk.TclError, ValueError):
+                pass
+        self._outline_job = self.after(400, self._refresh_outline_if_visible)
+
+    def _refresh_outline_if_visible(self):
+        self._outline_job = None
+        if not self.winfo_exists():
+            return
+        self.refresh_outline()
+        self.refresh_slide_choices()
+
+    def refresh_slide_choices(self):
+        """把「单页重建」下拉填成 brief 的段落列表。"""
+        if not hasattr(self, "slide_combo"):
+            return
+        brief, error = self._parsed_brief()
+        if error or not isinstance(brief, dict):
+            values = []
+        else:
+            values = []
+            for row in wl.section_outline(brief):
+                title = f" · {row['title']}" if row["title"] else ""
+                values.append(f"{row['index']}. {row['label']}{title}")
+        self.slide_combo["values"] = values
 
     def _outline_selected_index(self):
         sel = self.outline_tree.selection()
@@ -828,6 +939,13 @@ class Workbench(tk.Tk):
     def _set_busy(self, busy):
         for btn in self._generate_buttons:
             btn.config(state="disabled" if busy else "normal")
+        if hasattr(self, "abandon_btn"):
+            self.abandon_btn.config(state="normal" if busy else "disabled")
+        if hasattr(self, "progress"):
+            if busy:
+                self.progress.start(12)
+            else:
+                self.progress.stop()
         self.config(cursor="watch" if busy else "")
         self.update_idletasks()
 
@@ -844,6 +962,7 @@ class Workbench(tk.Tk):
             self.brief_text.edit_modified(False)
             self._dirty = True
             self._set_title()
+            self._schedule_outline_refresh()
 
     def _confirm_discard(self):
         """返回 True 表示可以继续（无改动、已保存或用户选择放弃）。"""
@@ -874,21 +993,26 @@ class Workbench(tk.Tk):
     def refresh_history(self):
         self.version_list.delete(0, "end")
         hd = self.history_var.get().strip()
+        if hasattr(self, "history_status_var"):
+            self.history_status_var.set(self._read_history_status(hd))
         if not hd:
             return
         self._versions = list_versions(hd)
         for v in self._versions:
-            label = v["id"]
-            if v.get("legacy"):
-                label += "（旧版）"
-            elif v.get("error"):
-                label += "（无法读取）"
-            elif v.get("template_name"):
-                label += f"（{v['template_name']}）"
-            self.version_list.insert("end", label)
+            self.version_list.insert("end", wl.version_label(v))
         latest = find_latest_preview(hd)
         if latest:
             self.show_preview(latest)
+
+    def _read_history_status(self, history_dir):
+        if not history_dir:
+            return "尚无生成记录"
+        try:
+            with open(os.path.join(history_dir, ".last_generated.json"), "r", encoding="utf-8") as fh:
+                marker = json.load(fh)
+        except (OSError, ValueError):
+            marker = None
+        return wl.history_status_text(marker)
 
     def on_version_select(self):
         hd = self.history_var.get().strip()
@@ -902,17 +1026,139 @@ class Workbench(tk.Tk):
             v = self._versions[idx]
             if v["preview"]:
                 self.show_preview(v["preview"])
+            else:
+                self.preview_label.config(image="", text="该版本没有预览图")
 
-    def show_preview(self, path, max_w=880):
+    def show_preview(self, path=None, max_w=880):
+        if path:
+            self._preview_path = path
+            self._preview_scale = 1.0
+        if not self._preview_path or not os.path.isfile(self._preview_path):
+            self.preview_label.config(image="", text="（尚无预览）")
+            return
         try:
-            img = tk.PhotoImage(file=path)
-            w = img.width()
-            if w > max_w:
-                img = img.subsample(max(1, round(w / max_w)), max(1, round(w / max_w)))
-            self.preview_img = img
-            self.preview_label.config(image=img, text="")
+            self._preview_base = tk.PhotoImage(file=self._preview_path)
         except Exception as e:
+            self._preview_base = None
             self.preview_label.config(image="", text=f"无法显示预览：{e}")
+            return
+        self._preview_pil = None
+        self.preview_max_w = max_w
+        self._apply_preview()
+
+    def _apply_preview(self):
+        """按当前缩放比例渲染预览；优先用 PIL 平滑缩放，退化到 Tk 整数倍。"""
+        if not self._preview_path or not os.path.isfile(self._preview_path):
+            return
+        max_w = float(getattr(self, "preview_max_w", 880))
+        scale = float(getattr(self, "_preview_scale", 1.0))
+        try:
+            from PIL import Image, ImageTk
+            if getattr(self, "_preview_pil", None) is None:
+                self._preview_pil = Image.open(self._preview_path)
+            source = self._preview_pil
+            ratio = min(4.0, max(0.1, scale * min(1.0, max_w / source.width)))
+            size = (max(1, int(source.width * ratio)), max(1, int(source.height * ratio)))
+            photo = ImageTk.PhotoImage(source.resize(size, Image.LANCZOS))
+        except Exception:
+            base = self._preview_base
+            if base is None:
+                return
+            fit = min(1.0, max_w / max(1, base.width()))
+            ratio = scale * fit
+            if ratio >= 1:
+                zoom, subsample = max(1, int(round(ratio))), 1
+            else:
+                zoom, subsample = 1, max(1, int(round(1 / ratio)))
+            photo = base
+            try:
+                if zoom > 1:
+                    photo = photo.zoom(zoom, zoom)
+                if subsample > 1:
+                    photo = photo.subsample(subsample, subsample)
+            except tk.TclError:
+                photo = base
+        self.preview_img = photo
+        self.preview_label.config(image=photo, text="")
+
+    def zoom_preview(self, delta):
+        if self._preview_base is None:
+            return
+        scale = float(getattr(self, "_preview_scale", 1.0))
+        scale = scale * (1.5 if delta > 0 else 1 / 1.5)
+        self._preview_scale = min(4.0, max(0.25, scale))
+        self._apply_preview()
+
+    def fit_preview(self):
+        self._preview_scale = 1.0
+        self._apply_preview()
+
+    def open_preview(self):
+        sel = self.version_list.curselection()
+        if not sel or not hasattr(self, "_versions"):
+            return
+        preview = self._versions[sel[0]].get("preview")
+        if preview and os.path.isfile(preview):
+            open_path(preview)
+        else:
+            messagebox.showinfo("提示", "该版本没有预览图")
+
+    def open_version_dir(self):
+        hd = self.history_var.get().strip()
+        sel = self.version_list.curselection()
+        if not hd or not sel or not hasattr(self, "_versions"):
+            return
+        vid = self._versions[sel[0]].get("id") or ""
+        if not wl.is_safe_version_id(vid):
+            messagebox.showerror("无法打开", f"版本 id 不合法：{vid!r}")
+            return
+        path = os.path.join(hd, "versions", vid)
+        if os.path.isdir(path):
+            open_path(path)
+        else:
+            path = os.path.join(hd, "versions", vid + ".yaml")
+            if os.path.isfile(path):
+                reveal_path(path)
+
+    def delete_version(self):
+        hd = self.history_var.get().strip()
+        sel = self.version_list.curselection()
+        if not hd or not sel or not hasattr(self, "_versions"):
+            messagebox.showwarning("提示", "请先选择要删除的版本")
+            return
+        vid = self._versions[sel[0]].get("id") or ""
+        if not wl.is_safe_version_id(vid):
+            messagebox.showerror("无法删除", f"版本 id 不合法：{vid!r}")
+            return
+        base = os.path.realpath(hd)
+        targets = [os.path.join(hd, "versions", vid), os.path.join(hd, "previews", vid),
+                   os.path.join(hd, "versions", vid + ".yaml")]
+        safe = []
+        for target in targets:
+            if not os.path.exists(target):
+                continue
+            try:
+                if os.path.commonpath([base, os.path.realpath(target)]) != base:
+                    messagebox.showerror("无法删除", "目标不在历史目录内")
+                    return
+            except ValueError:
+                messagebox.showerror("无法删除", "目标与历史目录不在同一磁盘")
+                return
+            safe.append(target)
+        if not safe:
+            return
+        if not messagebox.askyesno("删除版本",
+                                   f"删除 {vid}？\n会移除该版本的快照与预览；共享图片资产保留。"):
+            return
+        removed = 0
+        for target in safe:
+            if os.path.isdir(target):
+                shutil.rmtree(target)
+            else:
+                os.remove(target)
+            removed += 1
+        self._set_result(f"已删除历史版本 {vid}（{removed} 项）\n")
+        self.refresh_history()
 
     def rebuild_version(self):
         hd = self.history_var.get().strip()
@@ -1044,8 +1290,12 @@ class Workbench(tk.Tk):
             pass
 
     def on_close(self):
+        if self._generating and not messagebox.askyesno(
+                "仍在生成", "生成任务尚未结束，仍要退出吗？\n后台任务可能继续写完文件。"):
+            return
         if not self._confirm_discard():
             return
+        self._generating = False
         self.save_state()
         self.destroy()
 
