@@ -14,6 +14,8 @@ from pptx import Presentation
 from pptx.util import Emu
 
 DESCR_PREFIX = "gmppt:"
+TAGS_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tags"
+NS_TAGS = "http://schemas.openxmlformats.org/presentationml/2006/main"
 
 
 def shape_text(shape):
@@ -35,12 +37,33 @@ def shape_marker(shape):
     return descr if descr.startswith(DESCR_PREFIX) else None
 
 
+def shape_tags(shape):
+    """读取挂在对象上的 PowerPoint Tags（p:nvPr/p:custDataLst/p:tags → tags 部件）。"""
+    try:
+        nv_pr = shape._element._nvXxPr.nvPr
+        tags_ref = nv_pr.find(".//p:custDataLst/p:tags", {"p": NS_TAGS})
+        if tags_ref is None:
+            return {}
+        rid = tags_ref.get("{%s}id" % "http://schemas.openxmlformats.org/officeDocument/2006/relationships")
+        part = shape.part.related_part(rid)
+    except Exception:
+        return {}
+    try:
+        from lxml import etree
+        root = etree.fromstring(part.blob)
+        return {tag.get("name"): tag.get("val")
+                for tag in root.findall("{%s}tag" % NS_TAGS)}
+    except Exception:
+        return {}
+
+
 def describe_shape(shape):
     item = {
         "shape_id": getattr(shape, "shape_id", None),
         "name": getattr(shape, "name", None),
         "type": str(getattr(shape, "shape_type", None)),
         "marker": shape_marker(shape),
+        "tags": shape_tags(shape),
     }
     text = shape_text(shape)
     if text:

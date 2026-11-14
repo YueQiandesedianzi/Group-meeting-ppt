@@ -9,10 +9,15 @@ v1 的 `scripts/`、`SKILL.md` 未做任何修改。
 v2/
 ├─ tools/
 │  ├─ build_samples.py    生成参考模板与“手工修改”对照样例
-│  ├─ pptx_inspect.py     只读检查：页面/对象/身份候选，可两文件 diff
+│  ├─ pptx_inspect.py     只读检查：页面/对象/身份候选/Tags，可两文件 diff
 │  ├─ roundtrip_check.py  用可用客户端重新保存，比较身份与结构保留
-│  └─ retention_check.py  按 ZIP 部件比较字节哈希（保留性证据）
-├─ samples/               生成的样例（PPTX 与映射 JSON）
+│  ├─ retention_check.py  按 ZIP 部件比较字节哈希（保留性证据）
+│  ├─ tags_probe.py       PowerPoint Tags 创建 / 读回 / 往返存活试验
+│  └─ object_ops_demo.py  对象级修改原型验证（未指向对象保留 + 部件保留）
+├─ engine/
+│  └─ object_ops.py       对象级修改适配层：文本 / 图片 / 几何 / 页序 + 身份冲突保护
+├─ tests/test_m0.py       M0 回归测试（快速 11 项 + 慢速客户端往返 2 项）
+├─ samples/               生成的样例（PPTX、映射 JSON 与配图）
 └─ reports/               机器可读的验证报告
 ```
 
@@ -23,6 +28,11 @@ python v2\tools\build_samples.py
 python v2\tools\pptx_inspect.py v2\samples\reference-template.pptx -o v2\reports\inspect-reference.json
 python v2\tools\roundtrip_check.py --input v2\samples\reference-template.pptx --report v2\reports\roundtrip-reference.json
 python v2\tools\retention_check.py v2\samples\reference-template.pptx v2\samples\reference-template.roundtrip.pptx
+python v2\tools\tags_probe.py
+python v2\tools\object_ops_demo.py
+
+python -m unittest discover -s v2/tests -v                          # 快速回归
+$env:GM_PPT_SLOW='1'; python -m unittest discover -s v2/tests -v    # 含客户端往返
 ```
 
 `roundtrip_check.py` 默认用 DSH 自带的 LibreOffice Kit 作为客户端代理；可用 `--node` /
@@ -41,6 +51,10 @@ python v2\tools\retention_check.py v2\samples\reference-template.pptx v2\samples
 
 ## 当前结论
 
-见 reports/M0-preliminary.md。要点：身份标记与 SlideID→部件映射在客户端保存后仍可用；
-母版形状会被 LibreOffice 下放到全部布局（视觉保留、结构变化）；客户端保存会重写几乎所有部件，
-因此保留性必须按部件与语义检查；页序验证在当前代理客户端上存在盲区，需 PowerPoint 复核。
+见 reports/M0-preliminary.md。要点：
+
+- 备用文本身份标记与 SlideID→部件映射在客户端保存后仍可用；**PowerPoint Tags 会被 LibreOffice 全部丢弃**，
+  因此身份需要 Tags + 备用文本双载体，并由 doctor 声明客户端能力。
+- 对象级修改原型通过验证：未指向对象 0 变化，50 个部件中 45 个字节不变。
+- 母版形状会被 LibreOffice 下放到全部布局（视觉保留、结构变化）；客户端保存会重写几乎所有部件，
+  因此保留性必须按部件与语义检查；页序验证在当前代理客户端上存在盲区，需 PowerPoint 复核。

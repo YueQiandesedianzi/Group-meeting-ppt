@@ -1,0 +1,116 @@
+{
+  "source": "E:\\测试\\group-meeting-ppt-publish\\v2\\samples\\reference-template.pptx",
+  "target": "E:\\测试\\group-meeting-ppt-publish\\v2\\samples\\object-ops.pptx",
+  "plan": [
+    {
+      "op": "set_text",
+      "identity": "gmppt:page-title:cover-title=d68ff1b5-fda4-415c-87d6-d5d8c6e30266",
+      "text": "对象级修改：只改这一段"
+    },
+    {
+      "op": "replace_picture",
+      "identity": "gmppt:picture:result-chart=cc3fa499-3ac7-4985-a5e7-b082f76b388b",
+      "image": "E:\\测试\\group-meeting-ppt-publish\\v2\\samples\\assets\\chart-accuracy-v2.png"
+    },
+    {
+      "op": "set_geometry",
+      "identity": "gmppt:picture:result-chart=cc3fa499-3ac7-4985-a5e7-b082f76b388b",
+      "left": 1.2,
+      "top": 2.2,
+      "width": 6.4,
+      "keep_aspect": true
+    },
+    {
+      "op": "reorder_slides",
+      "order": [
+        256,
+        260,
+        257,
+        258,
+        259
+      ]
+    }
+  ],
+  "results": [
+    {
+      "op": "set_text",
+      "identity": "gmppt:page-title:cover-title=d68ff1b5-fda4-415c-87d6-d5d8c6e30266",
+      "text": "对象级修改：只改这一段",
+      "slide_id": 256
+    },
+    {
+      "op": "replace_picture",
+      "identity": "gmppt:picture:result-chart=cc3fa499-3ac7-4985-a5e7-b082f76b388b",
+      "image": "E:\\测试\\group-meeting-ppt-publish\\v2\\samples\\assets\\chart-accuracy-v2.png",
+      "slide_id": 258,
+      "new_media": "/ppt/media/image4.png",
+      "shared_media_untouched": true
+    },
+    {
+      "op": "set_geometry",
+      "identity": "gmppt:picture:result-chart=cc3fa499-3ac7-4985-a5e7-b082f76b388b",
+      "slide_id": 258,
+      "frame": [
+        1097280,
+        2011680,
+        5852160,
+        3291840
+      ]
+    },
+    {
+      "op": "reorder_slides",
+      "order": [
+        256,
+        260,
+        257,
+        258,
+        259
+      ]
+    }
+  ],
+  "touched_identities": [
+    "gmppt:page-title:cover-title=d68ff1b5-fda4-415c-87d6-d5d8c6e30266",
+    "gmppt:picture:result-chart=cc3fa499-3ac7-4985-a5e7-b082f76b388b"
+  ],
+  "untouched_changed": [],
+  "untouched_missing": [],
+  "unexpected_added": [],
+  "retention_totals": {
+    "identical": 45,
+    "added": 1,
+    "rewritten": 4
+  },
+  "retention_by_category": {
+    "other": {
+      "identical": 5,
+      "rewritten": 1
+    },
+    "package-rels": {
+      "identical": 1
+    },
+    "docProps": {
+      "identical": 3
+    },
+    "part-rels": {
+      "identical": 1
+    },
+    "media": {
+      "identical": 3,
+      "added": 1
+    },
+    "layout": {
+      "identical": 22
+    },
+    "master": {
+      "identical": 2
+    },
+    "slide": {
+      "identical": 7,
+      "rewritten": 3
+    },
+    "theme": {
+      "identical": 1
+    }
+  },
+  "verdict": "pass"
+}

@@ -1,0 +1,34 @@
+{
+  "client": "libreoffice-kit",
+  "client_is_powerpoint": false,
+  "tagged_shapes": 9,
+  "tags_parts_before": [
+    "ppt/tags/tag01.xml",
+    "ppt/tags/tag02.xml",
+    "ppt/tags/tag03.xml",
+    "ppt/tags/tag04.xml",
+    "ppt/tags/tag05.xml"
+  ],
+  "tags_parts_after": [],
+  "tags_readable_before": 9,
+  "tags_readable_after": 0,
+  "markers_kept": 0,
+  "tags_identical": 0,
+  "tags_changed": [],
+  "tags_lost": [
+    "gmppt:fixed:page-band=f17e6921-70b0-425c-bcbf-6f837a909522",
+    "gmppt:page-title:body-title=a3f78697-5af7-4b92-aa3c-ef435983210a",
+    "gmppt:page-title:cover-title=d68ff1b5-fda4-415c-87d6-d5d8c6e30266",
+    "gmppt:page-title:figure-title=a4b54a5f-7c33-47ab-8d42-95b344af6be1",
+    "gmppt:page-title:summary-title=c9164e7d-27f1-400b-945a-9fb1140a4324",
+    "gmppt:page-title:two-figure-title=6870ce77-063b-4159-8a2e-a4722c5a69fc",
+    "gmppt:picture:result-chart=cc3fa499-3ac7-4985-a5e7-b082f76b388b",
+    "gmppt:picture:two-figure-left=5ca4d4e2-0672-40d1-97dd-c5cdfb9d8fb9",
+    "gmppt:picture:two-figure-right=b719feb1-663d-4dfe-9ec9-eeaf7c052a5f"
+  ],
+  "convert_meta": {
+    "backend": "native",
+    "missingFonts": [],
+    "outputPath": "E:\\测试\\group-meeting-ppt-publish\\v2\\samples\\tags-sample.roundtrip.pptx"
+  }
+}
