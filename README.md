@@ -130,8 +130,9 @@ group-meeting-ppt/
 ├─ templates/                   主题档案（default、lab）
 ├─ references/layout-library.md 10 类版式的字段与选择规则
 ├─ assets/                      示例 brief 与演示配图
-├─ tests/test_history.py        历史与版式回归测试
-└─ docs/assets/                 README 效果图
+├─ tests/                       回归测试（历史 / 版式 / 生成安全 / 工作台逻辑与 UI）
+├─ tools/measure_workbench_ui.py 工作台易用性指标采集
+└─ docs/                        README 效果图与工作台易用性评估
 ```
 
 ## 历史版本与单页重建
@@ -174,7 +175,9 @@ python scripts/generate_ppt.py brief.yaml -o out/demo.pptx --slide 2
 python -m unittest discover -s tests -v
 ```
 
-共 64 个用例，覆盖完整历史重建、图片去重、模板与图片变化、失败回滚、输出哈希校验、单页后全量、归档损坏、旧格式兼容与 10 类版式，另含输入保护（拒绝覆盖 brief / 模板 / 引用图片）、版式容量、工作台模板路径安全、未保存确认流程、大纲解析与段落增删移、版式骨架可生成校验，以及历史条目标签与版本 id 安全校验。测试输入和输出均位于临时目录，不读取真实组会历史。
+共 80 个用例（逻辑 64 + 工作台 UI 16），覆盖完整历史重建、图片去重、模板与图片变化、失败回滚、输出哈希校验、单页后全量、归档损坏、旧格式兼容与 10 类版式，另含输入保护（拒绝覆盖 brief / 模板 / 引用图片）、版式容量、工作台模板路径安全、未保存确认流程、大纲解析与段落增删移、版式骨架可生成校验、历史条目标签与版本 id 安全校验。UI 用例驱动真实 Tk 实例（不进入 mainloop），在无显示环境自动跳过。测试输入和输出均位于临时目录，不读取真实组会历史。
+
+工作台的行为与易用性评估见 [docs/workbench-usability.md](docs/workbench-usability.md)，指标可用 `python tools/measure_workbench_ui.py` 复现。
 
 ## 使用注意
 
