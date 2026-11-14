@@ -1,7 +1,7 @@
-# 派生文件：往返产物与渲染输出不入库
+# 根 .gitignore 忽略 *.pptx；M0 样例是关键证据，这里重新纳入
+!samples/*.pptx
+
+# 派生文件：往返产物与渲染输出不入库（放在后面，优先级更高）
 *.roundtrip.pptx
 render-*/
 __pycache__/
-
-# 根 .gitignore 忽略 *.pptx；M0 样例是关键证据，这里重新纳入
-!samples/*.pptx
