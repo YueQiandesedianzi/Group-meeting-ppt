@@ -25,6 +25,8 @@
 | 10 | 形状 id / 类型 | 不稳定 | id 2–6 → 94–99；`TEXT_BOX` 变 `AUTO_SHAPE`；名称与标记保留 |
 | 11 | 表格对象 | 通过 | 往返后表格与内容保留 |
 | 12 | 复杂度兜底 | 未覆盖 | 图表 / SmartArt / OLE / 媒体 / 公式样例尚未纳入 |
+| 13 | PowerPoint Tags 往返 | **代理上丢失** | LibreOffice 保存后 @B@ppt/tags/*@B@ 全部消失，9/9 对象的 Tags 归零；我们自己的读写保存 9/9 保留 |
+| 14 | 对象级修改（文本 / 图片 / 几何 / 页序） | 通过（原型） | 未指向对象 0 变化；50 个部件中 45 个字节不变，仅 4 个重写、1 个新增 |
 
 ## 2. 关键测量
 
@@ -101,3 +103,51 @@ LibreOffice 保存后:
 - 样例为合成模板，不等同于真实模板（规格 §14 要求的真实输入仍未取得）。
 - 渲染用 LibreOffice，与 PowerPoint 存在字体、字距与抗锯齿差异；文中所有“视觉一致”仅指同一渲染器下的对比。
 - 未覆盖动画、超链接、多媒体、公式等语义保留。
+
+### 2.5 PowerPoint Tags 往返（规格 §6.1 建议的正式身份载体）
+
+试验方式：给 9 个带身份标记的对象挂上 `gmppt.project / gmppt.slide / gmppt.object` 三组 Tags，
+Tags 存放在独立部件 `ppt/tags/tag01.xml … tag05.xml`，由对象 `p:nvPr/p:custDataLst/p:tags` 以 `r:id` 引用。
+
+```text
+我方读写保存（python-pptx）：tags 部件 5 个保留，9/9 对象标签完全一致
+LibreOffice 保存往返：        tags 部件 0 个，9/9 对象标签全部丢失
+```
+
+结论：**Tags 不能经 LibreOffice 这类客户端保存**。这意味着
+
+1. 任何以 Tags 为唯一身份载体的设计，在链路中只要有一次非 PowerPoint 的保存就会失去全部身份；
+2. 备用文本（`descr`）在两种路径下都保留，应作为与 Tags 并行的冗余载体；
+3. `doctor` 必须能报告“当前客户端是否保留 Tags”，否则同步会在无提示的情况下退化为盲写。
+4. PowerPoint 对 Tags 的真实行为仍未验证（本机无 PowerPoint），本结论只说明代理行为。
+
+### 2.6 对象级修改原型（M1 起步）
+
+`v2/engine/object_ops.py` 实现了四类按身份定位的操作：`set_text`（保留首 run 格式、多段落报能力不足）、
+`replace_picture`（建立新媒体引用，不覆盖共享媒体）、`set_geometry`（可按比例约束）、
+`reorder_slides`（按 slide_id 序列重排，参数不匹配即拒绝）。身份重复时直接拒绝写入。
+
+`v2/tools/object_ops_demo.py` 对参考模板连续执行：改封面标题 → 换结果图 → 调整图片位置尺寸 → 把小节页移到第 2 位，
+然后做两项检查：
+
+```text
+未指向对象：changed 0 / missing 0 / unexpected_added 0      → 通过
+部件级保留：identical 45 / rewritten 4 / added 1（新增媒体）  → 只有目标页与包级清单被重写
+```
+
+被重写的 4 个部件是：两张目标幻灯片、`[Content_Types].xml`、`presentation.xml`（页序）；
+母版、11 个布局、主题、既有媒体全部字节不变。这验证了规格 §3.2「普通更新采用对象级修改」在当前技术栈上可行。
+
+## 6. 本轮新增工具
+
+| 工具 | 作用 |
+|---|---|
+| `v2/tools/tags_probe.py` | 创建 PowerPoint Tags、读回校验、客户端往返后比较存活 |
+| `v2/engine/object_ops.py` | 对象级修改适配层原型（文本 / 图片 / 几何 / 页序 + 身份冲突保护） |
+| `v2/tools/object_ops_demo.py` | 原型验证：未指向对象保留 + 部件级保留报告 |
+
+## 7. 对下一步的直接建议
+
+1. Tags 相关设计改为「Tags + 备用文本」双载体，并在 `doctor` 中声明客户端能力。
+2. 对象级操作已可用，可先接入 M1 的文本与图片两条链路，页序操作等 PowerPoint 复核后再启用。
+3. 仍需在装有 PowerPoint 的目标机上复核：页序是否按 `sldIdLst` 生效、Tags 是否保留、`SlideID` 是否稳定。
