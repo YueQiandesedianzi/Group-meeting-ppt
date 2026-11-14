@@ -52,5 +52,42 @@ class TemplatePathTests(unittest.TestCase):
                 tw.template_output_path(directory, "linked")
 
 
+class DiscardGuardTests(unittest.TestCase):
+    """未保存修改的确认流程：无改动直接放行，取消留在原文件，选择保存走 save_brief。"""
+
+    def _obj(self, dirty):
+        obj = SimpleNamespace(_dirty=dirty, save_brief=Mock(return_value=True))
+        return obj
+
+    def test_clean_passes_without_dialog(self):
+        obj = self._obj(False)
+        with patch.object(wb.messagebox, "askyesnocancel") as ask:
+            self.assertTrue(wb.Workbench._confirm_discard(obj))
+        ask.assert_not_called()
+
+    def test_cancel_blocks_and_keeps_file(self):
+        obj = self._obj(True)
+        with patch.object(wb.messagebox, "askyesnocancel", return_value=None):
+            self.assertFalse(wb.Workbench._confirm_discard(obj))
+        obj.save_brief.assert_not_called()
+
+    def test_discard_passes_without_saving(self):
+        obj = self._obj(True)
+        with patch.object(wb.messagebox, "askyesnocancel", return_value=False):
+            self.assertTrue(wb.Workbench._confirm_discard(obj))
+        obj.save_brief.assert_not_called()
+
+    def test_yes_saves_and_reports_failure(self):
+        obj = self._obj(True)
+        with patch.object(wb.messagebox, "askyesnocancel", return_value=True):
+            self.assertTrue(wb.Workbench._confirm_discard(obj))
+        obj.save_brief.assert_called_once_with()
+
+        failing = self._obj(True)
+        failing.save_brief = Mock(return_value=False)
+        with patch.object(wb.messagebox, "askyesnocancel", return_value=True):
+            self.assertFalse(wb.Workbench._confirm_discard(failing))
+
+
 if __name__ == "__main__":
     unittest.main()

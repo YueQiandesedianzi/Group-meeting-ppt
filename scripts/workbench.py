@@ -7,6 +7,7 @@
 import os
 import sys
 import json
+import subprocess
 from types import SimpleNamespace
 
 import tkinter as tk
@@ -18,6 +19,7 @@ if SCRIPT_DIR not in sys.path:
 
 import generate_ppt as g  # noqa: E402
 import template_wizard as tw  # noqa: E402
+import workbench_logic as wl  # noqa: E402
 
 TDIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "templates"))
 STATE_PATH = os.path.join(os.path.expanduser("~"), ".bohrium", "ppt-workbench.json")
@@ -128,6 +130,27 @@ def list_versions(history_dir):
     return out
 
 
+def open_path(path):
+    """跨平台打开文件/目录（Windows 用 startfile）。"""
+    if os.name == "nt":
+        os.startfile(path)
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", path])
+    else:
+        subprocess.Popen(["xdg-open", path])
+
+
+def reveal_path(path):
+    """在系统文件管理器中定位文件。"""
+    path = os.path.abspath(path)
+    if os.name == "nt":
+        subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", "-R", path])
+    else:
+        subprocess.Popen(["xdg-open", os.path.dirname(path)])
+
+
 # ---------------- 工作台界面 ----------------
 
 class Workbench(tk.Tk):
@@ -137,6 +160,15 @@ class Workbench(tk.Tk):
         self.geometry("1180x760")
 
         st = load_state()
+        self._dirty = False
+        self._loading = False
+        self._generate_buttons = []
+        geometry = st.get("geometry")
+        if isinstance(geometry, str) and "x" in geometry:
+            try:
+                self.geometry(geometry)
+            except tk.TclError:
+                pass
         self.recent_briefs = [p for p in st.get("recent_briefs", []) if os.path.isfile(p)]
         self.brief_path = st.get("current_brief") or None
         self.template_name = st.get("template") or "default"
@@ -163,6 +195,11 @@ class Workbench(tk.Tk):
         self.refresh_template_combo()
         if self.brief_path:
             self.load_brief_into_editor(self.brief_path)
+        tab = st.get("tab")
+        if isinstance(tab, int) and 0 <= tab < len(self.nb.tabs()):
+            self.nb.select(tab)
+        self._bind_shortcuts()
+        self._set_title()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
     # ---------- 布局 ----------
@@ -172,7 +209,8 @@ class Workbench(tk.Tk):
         ttk.Button(bar, text="新建 brief", command=self.new_brief).pack(side="left", padx=2)
         ttk.Button(bar, text="打开 brief…", command=self.open_brief).pack(side="left", padx=2)
         ttk.Button(bar, text="刷新", command=self.refresh_all).pack(side="left", padx=2)
-        ttk.Button(bar, text="打开输出…", command=self.open_output).pack(side="left", padx=2)
+        ttk.Button(bar, text="打开输出", command=self.open_output).pack(side="left", padx=2)
+        ttk.Button(bar, text="打开所在文件夹", command=self.reveal_output).pack(side="left", padx=2)
 
     def _build_body(self):
         body = ttk.Frame(self)
@@ -186,9 +224,20 @@ class Workbench(tk.Tk):
         self.brief_list = tk.Listbox(left, height=8)
         self.brief_list.pack(fill="x", pady=(2, 8))
         self.brief_list.bind("<Double-Button-1>", lambda e: self.open_selected_brief())
-        ttk.Label(left, text="模板").pack(anchor="w")
+        self.brief_list.bind("<Motion>", self._on_brief_hover)
+        self.brief_list.bind("<Leave>", lambda e: self.update_status())
+        self.brief_list.bind("<Button-3>", self._show_brief_menu)
+        self._brief_menu = tk.Menu(self, tearoff=0)
+        self._brief_menu.add_command(label="打开", command=self.open_selected_brief)
+        self._brief_menu.add_command(label="在资源管理器中显示", command=self.reveal_selected_brief)
+        self._brief_menu.add_separator()
+        self._brief_menu.add_command(label="从最近列表移除", command=self.remove_selected_brief)
+
+        ttk.Label(left, text="模板（点击切换）").pack(anchor="w")
         self.tpl_list = tk.Listbox(left, height=10)
         self.tpl_list.pack(fill="both", expand=True, pady=(2, 0))
+        self.tpl_list.bind("<<ListboxSelect>>", self.on_template_select)
+        self.tpl_list.bind("<Double-Button-1>", self.on_template_select)
 
         # 主区 Notebook
         self.nb = ttk.Notebook(body)
@@ -225,6 +274,7 @@ class Workbench(tk.Tk):
         xs.grid(row=1, column=0, sticky="ew")
         tf.rowconfigure(0, weight=1)
         tf.columnconfigure(0, weight=1)
+        self.brief_text.bind("<<Modified>>", self._on_text_modified)
 
         row2 = ttk.Frame(f)
         row2.pack(fill="x", pady=(6, 0))
@@ -260,8 +310,11 @@ class Workbench(tk.Tk):
 
         btns = ttk.Frame(f)
         btns.pack(fill="x", pady=8)
-        ttk.Button(btns, text="全量生成", command=lambda: self.do_generate(None)).pack(side="left", padx=2)
-        ttk.Button(btns, text="单页重建", command=self.do_generate_slide).pack(side="left", padx=2)
+        full_btn = ttk.Button(btns, text="全量生成（Ctrl+Enter）", command=lambda: self.do_generate(None))
+        full_btn.pack(side="left", padx=2)
+        slide_btn = ttk.Button(btns, text="单页重建", command=self.do_generate_slide)
+        slide_btn.pack(side="left", padx=2)
+        self._generate_buttons = [full_btn, slide_btn]
 
         self.result_text = tk.Text(f, height=8, wrap="word", state="disabled")
         self.result_text.pack(fill="both", expand=True)
@@ -328,14 +381,66 @@ class Workbench(tk.Tk):
         items = list(self.recent_briefs)
         if self.brief_path and self.brief_path not in items:
             items.insert(0, self.brief_path)
-        for p in items:
-            self.brief_list.insert("end", p)
+        self._brief_paths = items
+        for label in wl.display_labels(items):
+            self.brief_list.insert("end", label)
 
     def refresh_left_templates(self):
         self.tpl_list.delete(0, "end")
-        for n in template_names():
-            mark = "  *" if n == self.template_name else ""
+        self._tpl_names = template_names()
+        for n in self._tpl_names:
+            mark = "  ←当前" if n == self.template_name else ""
             self.tpl_list.insert("end", n + mark)
+
+    def on_template_select(self, event=None):
+        sel = self.tpl_list.curselection()
+        if not sel or not getattr(self, "_tpl_names", []):
+            return
+        name = self._tpl_names[sel[0]]
+        self.template_name = name
+        self.template_var.set(name)
+        self.refresh_left_templates()
+        if name in self._tpl_names:
+            index = self._tpl_names.index(name)
+            self.tpl_list.selection_clear(0, "end")
+            self.tpl_list.selection_set(index)
+        self.update_status()
+
+    def _on_brief_hover(self, event=None):
+        index = self.brief_list.nearest(event.y) if event is not None else -1
+        paths = getattr(self, "_brief_paths", [])
+        if 0 <= index < len(paths):
+            self.status_var.set(paths[index])
+
+    def _show_brief_menu(self, event):
+        paths = getattr(self, "_brief_paths", [])
+        if not paths:
+            return
+        index = self.brief_list.nearest(event.y)
+        self.brief_list.selection_clear(0, "end")
+        self.brief_list.selection_set(index)
+        self._brief_menu.tk_popup(event.x_root, event.y_root)
+
+    def selected_brief_path(self):
+        sel = self.brief_list.curselection()
+        paths = getattr(self, "_brief_paths", [])
+        if not sel or not paths or sel[0] >= len(paths):
+            return None
+        return paths[sel[0]]
+
+    def reveal_selected_brief(self):
+        path = self.selected_brief_path()
+        if path:
+            reveal_path(path)
+
+    def remove_selected_brief(self):
+        path = self.selected_brief_path()
+        if not path:
+            return
+        if path in self.recent_briefs:
+            self.recent_briefs.remove(path)
+        self.refresh_left_briefs()
+        self.update_status()
 
     def refresh_template_combo(self):
         names = template_names()
@@ -357,6 +462,8 @@ class Workbench(tk.Tk):
 
     # ---------- brief 操作 ----------
     def load_brief_into_editor(self, path):
+        if not self._confirm_discard():
+            return
         try:
             with open(path, "r", encoding="utf-8") as fh:
                 text = fh.read()
@@ -365,11 +472,18 @@ class Workbench(tk.Tk):
             return
         self.brief_path = path
         self.brief_path_var.set(path)
-        self.brief_text.delete("1.0", "end")
-        self.brief_text.insert("1.0", text)
+        self._loading = True
+        try:
+            self.brief_text.delete("1.0", "end")
+            self.brief_text.insert("1.0", text)
+            self.brief_text.edit_modified(False)
+        finally:
+            self._loading = False
         if path not in self.recent_briefs:
             self.recent_briefs.insert(0, path)
+        self._dirty = False
         self.refresh_left_briefs()
+        self._set_title()
         self.update_status()
 
     def open_brief(self):
@@ -385,6 +499,8 @@ class Workbench(tk.Tk):
                 self.load_brief_into_editor(path)
 
     def new_brief(self):
+        if not self._confirm_discard():
+            return
         path = filedialog.asksaveasfilename(defaultextension=".yaml", filetypes=[("YAML", "*.yaml")], title="新建 brief")
         if not path:
             return
@@ -418,6 +534,8 @@ class Workbench(tk.Tk):
         except Exception as e:
             messagebox.showerror("错误", f"保存失败：{e}")
             return False
+        self._dirty = False
+        self._set_title()
         self.update_status()
         return True
 
@@ -438,16 +556,29 @@ class Workbench(tk.Tk):
         text = self.brief_text.get("1.0", "end")
         try:
             brief = yaml.safe_load(text)
-        except Exception as e:
-            self.validate_var.set(f"YAML 语法错误：{e}")
+        except yaml.YAMLError as e:
+            mark = getattr(e, "problem_mark", None)
+            line = mark.line + 1 if mark is not None else None
+            detail = getattr(e, "problem", None) or str(e)
+            self.validate_var.set(f"YAML 语法错误：第 {line} 行 {detail}" if line else f"YAML 语法错误：{detail}")
+            if line:
+                self.brief_text.mark_set("insert", f"{line}.0")
+                self.brief_text.see(f"{line}.0")
+                self.brief_text.focus_set()
             return
         base_dir = os.path.dirname(os.path.abspath(self.brief_path)) if self.brief_path else "."
         try:
             g.validate(brief, base_dir)
-            n = len(brief.get("sections", []))
-            self.validate_var.set(f"校验通过（{n} 段）")
         except ValueError as e:
             self.validate_var.set(f"校验失败：{e}")
+            return
+        pages = wl.estimate_pages(brief)
+        warnings = wl.compute_warnings(brief)
+        if warnings:
+            self.validate_var.set(f"校验通过（{pages} 段，{len(warnings)} 条提醒）")
+            self._set_result("生成前检查：\n" + "\n".join("• " + w for w in warnings) + "\n")
+        else:
+            self.validate_var.set(f"校验通过（{pages} 段）")
 
     # ---------- 生成 ----------
     def browse_output(self):
@@ -469,23 +600,38 @@ class Workbench(tk.Tk):
     def do_generate(self, slide):
         if not self._ensure_brief_saved():
             return
+        brief, error = self._current_brief()
+        if error:
+            messagebox.showerror("无法生成", error)
+            return
+        pages = wl.estimate_pages(brief)
+        warnings = wl.compute_warnings(brief)
+        if warnings and not messagebox.askyesno("生成前检查", wl.format_preflight(pages, warnings)):
+            self._set_result(f"已取消生成（{len(warnings)} 条提醒未处理）。\n")
+            return
+        summary = f"预检：{pages} 页" + (f"，{len(warnings)} 条提醒" if warnings else "，无提醒")
+        self._set_result(summary + "\n")
         output = self.output_var.get().strip()
         if not output:
             output = os.path.splitext(self.brief_path)[0] + ".pptx"
             self.output_var.set(output)
         template = self.template_var.get()
         history = self.history_var.get().strip() or None
+        self._set_busy(True)
         try:
             n, tn = run_generate(self.brief_path, output, template, slide=slide, history_dir=history)
         except Exception as e:
             self._set_result(f"失败：{e}\n")
             messagebox.showerror("生成失败", str(e))
             return
+        finally:
+            self._set_busy(False)
         self.template_name = template
         self._set_result(f"成功：共 {n} 页 · 模板 {tn} → {output}\n")
         if history:
             self.refresh_history()
         self.refresh_left_templates()
+        self.refresh_template_combo()
         self.update_status()
 
     def do_generate_slide(self):
@@ -500,6 +646,71 @@ class Workbench(tk.Tk):
         self.result_text.insert("end", msg)
         self.result_text.see("end")
         self.result_text.configure(state="disabled")
+
+    # ---------- 状态、快捷键与预检 ----------
+    def _current_brief(self):
+        """解析编辑器里的 brief 并做硬性校验，返回 (brief, error)。"""
+        import yaml
+        text = self.brief_text.get("1.0", "end")
+        try:
+            brief = yaml.safe_load(text)
+        except yaml.YAMLError as e:
+            mark = getattr(e, "problem_mark", None)
+            where = f"第 {mark.line + 1} 行 " if mark is not None else ""
+            return None, f"YAML 语法错误：{where}{getattr(e, 'problem', None) or e}"
+        if not isinstance(brief, dict):
+            return None, "brief 顶层必须是包含 meta 和 sections 的映射"
+        base_dir = os.path.dirname(os.path.abspath(self.brief_path)) if self.brief_path else "."
+        try:
+            g.validate(brief, base_dir)
+        except ValueError as e:
+            return None, str(e)
+        return brief, None
+
+    def _set_busy(self, busy):
+        for btn in self._generate_buttons:
+            btn.config(state="disabled" if busy else "normal")
+        self.config(cursor="watch" if busy else "")
+        self.update_idletasks()
+
+    def _set_title(self):
+        name = os.path.basename(self.brief_path) if self.brief_path else "未打开 brief"
+        mark = "● " if self._dirty else ""
+        self.title(f"{mark}组会 PPT 工作台 — {name}")
+
+    def _on_text_modified(self, event=None):
+        if self._loading:
+            self.brief_text.edit_modified(False)
+            return
+        if self.brief_text.edit_modified():
+            self.brief_text.edit_modified(False)
+            self._dirty = True
+            self._set_title()
+
+    def _confirm_discard(self):
+        """返回 True 表示可以继续（无改动、已保存或用户选择放弃）。"""
+        if not self._dirty:
+            return True
+        answer = messagebox.askyesnocancel(
+            "未保存的修改",
+            "当前 brief 有未保存的修改。\n\n是：保存后继续\n否：放弃修改\n取消：留在当前文件")
+        if answer is None:
+            return False
+        if answer:
+            return bool(self.save_brief())
+        return True
+
+    @staticmethod
+    def _shortcut(action):
+        action()
+        return "break"
+
+    def _bind_shortcuts(self):
+        self.bind_all("<Control-s>", lambda e: self._shortcut(self.save_brief))
+        self.bind_all("<Control-o>", lambda e: self._shortcut(self.open_brief))
+        self.bind_all("<Control-n>", lambda e: self._shortcut(self.new_brief))
+        self.bind_all("<Control-Return>", lambda e: self._shortcut(lambda: self.do_generate(None)))
+        self.bind_all("<F5>", lambda e: self._shortcut(self.refresh_all))
 
     # ---------- 历史与预览 ----------
     def refresh_history(self):
@@ -648,7 +859,14 @@ class Workbench(tk.Tk):
         if not out or not os.path.isfile(out):
             messagebox.showwarning("提示", "输出文件不存在")
             return
-        os.startfile(out)  # Windows
+        open_path(out)
+
+    def reveal_output(self):
+        out = self.output_var.get().strip()
+        if not out or not os.path.isfile(out):
+            messagebox.showwarning("提示", "输出文件不存在")
+            return
+        reveal_path(out)
 
     def save_state(self):
         st = {
@@ -657,6 +875,8 @@ class Workbench(tk.Tk):
             "template": self.template_name,
             "output": self.output_var.get(),
             "history_dir": self.history_var.get(),
+            "geometry": self.geometry(),
+            "tab": self.nb.index(self.nb.select()) if self.nb.tabs() else 0,
         }
         try:
             os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
@@ -666,6 +886,8 @@ class Workbench(tk.Tk):
             pass
 
     def on_close(self):
+        if not self._confirm_discard():
+            return
         self.save_state()
         self.destroy()
 
