@@ -2,3 +2,6 @@
 *.roundtrip.pptx
 render-*/
 __pycache__/
+
+# 根 .gitignore 忽略 *.pptx；M0 样例是关键证据，这里重新纳入
+!samples/*.pptx
